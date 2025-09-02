@@ -51,33 +51,51 @@
     let map;
     let cityCoordinates = {};
     let knownCities = [];
+    let activeMarker = null;
 
-    // 1️⃣ יצירת מפה "סטטית" בלי כל כלי עזר
+    // 1️⃣ יצירת מפה "סטטית"
     function initMap() {
       map = new google.maps.Map(document.getElementById('map'), {
         center: {lat: 31.5, lng: 34.8},
         zoom: 7,
         mapTypeId: 'roadmap',
-        disableDefaultUI: true,      // מסיר את כל הבקרים (זום, מפה לווינית וכו')
-        draggable: false,            // אין גרירה
-        scrollwheel: false,           // אין גלילה עם העכבר
-        disableDoubleClickZoom: true, // אין זום עם דאבל קליק
-        keyboardShortcuts: false      // אין קיצורי מקלדת
+        disableDefaultUI: true,
+        draggable: true,
+        scrollwheel: true,
+        disableDoubleClickZoom: true,
+        keyboardShortcuts: true
       });
     }
 
+    // 2️⃣ פונקציה להוספת הבהוב של 10 שניות בלבד
     function addFlashingMarker(lat, lng, message) {
+      // הסרת Marker קודם אם יש
+      if(activeMarker) {
+        activeMarker.setMap(null);
+      }
+
       const marker = new google.maps.Marker({
         position: {lat, lng},
         map: map,
         title: message
       });
+      activeMarker = marker;
+
+      // זום למיקום ההתרעה
+      map.setCenter({lat, lng});
+      map.setZoom(10);
 
       let visible = true;
-      setInterval(() => {
+      const interval = setInterval(() => {
         marker.setVisible(visible);
         visible = !visible;
       }, 600);
+
+      setTimeout(() => {
+        clearInterval(interval);
+        marker.setMap(null);
+        activeMarker = null;
+      }, 10000); // 10 שניות בלבד
 
       if (message) {
         const infowindow = new google.maps.InfoWindow({content: `<div class="info-box">${message}</div>`});
@@ -95,7 +113,7 @@
       return cities;
     }
 
-    // 2️⃣ טעינת הקואורדינטות
+    // 3️⃣ טעינת הקואורדינטות
     fetch('citiess.json')
       .then(response => response.json())
       .then(data => {
@@ -110,9 +128,19 @@
 
         if (!map) initMap();
 
+        // 4️⃣ האזנה להתרעות בזמן אמת (מהדקה האחרונה)
         db.ref("messages").on("child_added", snapshot => {
           const data = snapshot.val();
-          if (!data || !data.text) return;
+          if (!data || !data.text || !data.timestamp) return;
+
+          // זמן נוכחי לפי ישראל
+          const now = new Date();
+          const israelOffset = 3 * 60; // +3 שעות
+          const nowIsrael = new Date(now.getTime() + israelOffset*60000);
+
+          const msgTime = new Date(data.timestamp);
+          const diffMs = nowIsrael - msgTime;
+          if(diffMs > 60000) return; // רק אם בתוך הדקה האחרונה
 
           const message = data.text;
           const cities = extractCities(message, knownCities);

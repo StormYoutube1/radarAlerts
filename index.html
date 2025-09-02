@@ -30,9 +30,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-  <!-- Google Maps JS API -->
-  <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaGWR6n5uru3rd4sqtGNR-P-ZiYh5R7XI&language=he">
+  <!-- Google Maps JS API עם callback -->
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaGWR6n5uru3rd4sqtGNR-P-ZiYh5R7XI&language=he&callback=initMap"
+    async defer>
   </script>
 
   <script>
@@ -53,26 +54,25 @@
     let knownCities = [];
     let activeMarker = null;
 
-    // 1️⃣ יצירת מפה "סטטית"
+    // יצירת מפה ממורכזת על ישראל
     function initMap() {
       map = new google.maps.Map(document.getElementById('map'), {
-        center: {lat: 31.5, lng: 34.8},
+        center: {lat: 31.5, lng: 34.8}, // ישראל
         zoom: 7,
         mapTypeId: 'roadmap',
-        disableDefaultUI: true,
-        draggable: true,
-        scrollwheel: true,
+        disableDefaultUI: true,   // מסיר כפתורי לוויין / street view
+        draggable: true,          // כן אפשר להזיז עם עכבר
+        scrollwheel: true,        // כן אפשר זום עם גלגלת
         disableDoubleClickZoom: true,
         keyboardShortcuts: true
       });
+
+      // רק אחרי שהמפה מוכנה - לטעון ערים מאזון JSON
+      loadCitiesAndListen();
     }
 
-    // 2️⃣ פונקציה להוספת הבהוב של 10 שניות בלבד
     function addFlashingMarker(lat, lng, message) {
-      // הסרת Marker קודם אם יש
-      if(activeMarker) {
-        activeMarker.setMap(null);
-      }
+      if(activeMarker) activeMarker.setMap(null);
 
       const marker = new google.maps.Marker({
         position: {lat, lng},
@@ -81,7 +81,6 @@
       });
       activeMarker = marker;
 
-      // זום למיקום ההתרעה
       map.setCenter({lat, lng});
       map.setZoom(10);
 
@@ -95,65 +94,57 @@
         clearInterval(interval);
         marker.setMap(null);
         activeMarker = null;
-      }, 10000); // 10 שניות בלבד
+      }, 10000); // 10 שניות
 
       if (message) {
-        const infowindow = new google.maps.InfoWindow({content: `<div class="info-box">${message}</div>`});
+        const infowindow = new google.maps.InfoWindow({
+          content: `<div class="info-box">${message}</div>`
+        });
         marker.addListener("click", () => infowindow.open(map, marker));
       }
     }
 
     function extractCities(text, knownCities) {
-      const cities = [];
-      for (const city of knownCities) {
-        if (text.includes(city)) {
-          cities.push(city);
-        }
-      }
-      return cities;
+      return knownCities.filter(city => text.includes(city));
     }
 
-    // 3️⃣ טעינת הקואורדינטות
-    fetch('citiess.json')
-      .then(response => response.json())
-      .then(data => {
-        const citiesData = data.cities;
-        for (const key in citiesData) {
-          cityCoordinates[citiesData[key].he] = {
-            lat: citiesData[key].lat,
-            lng: citiesData[key].lng
-          };
-        }
-        knownCities = Object.keys(cityCoordinates);
-
-        if (!map) initMap();
-
-        // 4️⃣ האזנה להתרעות בזמן אמת (מהדקה האחרונה)
-        db.ref("messages").on("child_added", snapshot => {
-          const data = snapshot.val();
-          if (!data || !data.text || !data.timestamp) return;
-
-          // זמן נוכחי לפי ישראל
-          const now = new Date();
-          const israelOffset = 3 * 60; // +3 שעות
-          const nowIsrael = new Date(now.getTime() + israelOffset*60000);
-
-          const msgTime = new Date(data.timestamp);
-          const diffMs = nowIsrael - msgTime;
-          if(diffMs > 60000) return; // רק אם בתוך הדקה האחרונה
-
-          const message = data.text;
-          const cities = extractCities(message, knownCities);
-
-          for (const city of cities) {
-            const coords = cityCoordinates[city];
-            if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+    function loadCitiesAndListen() {
+      fetch('citiess.json')
+        .then(response => response.json())
+        .then(data => {
+          const citiesData = data.cities;
+          for (const key in citiesData) {
+            cityCoordinates[citiesData[key].he] = {
+              lat: citiesData[key].lat,
+              lng: citiesData[key].lng
+            };
           }
-        });
-      })
-      .catch(err => console.error('Error loading cities JSON:', err));
+          knownCities = Object.keys(cityCoordinates);
 
-    window.initMap = initMap;
+          // האזנה להתרעות בזמן אמת
+          db.ref("messages").on("child_added", snapshot => {
+            const data = snapshot.val();
+            if (!data || !data.text || !data.timestamp) return;
+
+            // לחשב לפי שעון ישראל
+            const now = new Date();
+            const msgTime = new Date(data.timestamp);
+            const diffMs = now - msgTime;
+            if(diffMs > 60000) return; // הודעות ישנות מ־60 שניות → מתעלמים
+
+            const message = data.text;
+            const cities = extractCities(message, knownCities);
+
+            for (const city of cities) {
+              const coords = cityCoordinates[city];
+              if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+            }
+          });
+        })
+        .catch(err => console.error('Error loading cities JSON:', err));
+    }
+
+    window.initMap = initMap; // חובה בשביל callback
   </script>
 </body>
 </html>

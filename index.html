@@ -200,6 +200,7 @@ Promise.all([
   Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
   validAreas = areasData;
   if(!map)initMap();
+  let activeInfoWindow = null;
 
   // --- יצירת פוליגונים ---
   Object.keys(polygonsData).forEach(city=>{
@@ -213,11 +214,19 @@ Promise.all([
       fillOpacity:0.4,
       map:null
     });
+    
     // infoWindow על לחיצה
     const infoWindow = new google.maps.InfoWindow({content: city});
-    polygon.addListener('click', e=>{ infoWindow.setPosition(e.latLng); infoWindow.open(map); });
-    cityPolygons[city]=polygon;
+    polygon.addListener('click', e=>{
+      if(activeInfoWindow) activeInfoWindow.close();
+      infoWindow.setPosition(e.latLng);
+      infoWindow.open(map);
+      activeInfoWindow = infoWindow;
+    });
+    cityPolygons[city] = polygon;
   });
+    
+  
 
   // --- התרעות Firebase ---
   db.ref("messages").on("child_added", snapshot=>{
@@ -298,3 +307,4 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+

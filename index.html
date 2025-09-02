@@ -130,16 +130,9 @@ Promise.all([
     if (now - msgTime > 60*1000) return;
 
     const message = data.text;
-
-    // בדיקה אם ההתרעה עדיין בתוקף (localStorage)
-    const alertKey = `alert_${data.timestamp}`;
-    const alertExpiry = localStorage.getItem(alertKey);
-    const expireTime = msgTime.getTime() + 10000; // 10 שניות
-    if (alertExpiry && now.getTime() < alertExpiry) return; // כבר הופעל
-    localStorage.setItem(alertKey, expireTime);
+    let settlements = new Set();
 
     // חילוץ ערים לפי • שם: עיר1, עיר2
-    let settlements = new Set();
     message.split("\n").forEach(line => {
       if (line.startsWith("•")) {
         let parts = line.split(":");
@@ -164,10 +157,7 @@ Promise.all([
       alertBox.innerHTML = message.replace(/\n/g, "<br>");
       alertBox.style.display = 'block';
 
-      setTimeout(() => { 
-        alertBox.style.display = 'none'; 
-        localStorage.removeItem(alertKey);
-      }, 10000);
+      setTimeout(() => { alertBox.style.display = 'none'; }, 10000);
 
       citiesInMessage.forEach(city => {
         const coords = cityCoordinates[city];

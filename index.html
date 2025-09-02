@@ -106,7 +106,7 @@ const sounds = {
   siren: "israel-siren-sound-2023-made-with-Voicemod.mp3",
   homefront: "eas-alarm-iphone-alarm-262882.mp3",
   alert: "alarm-301729.mp3",
-  beep: "mixkit-clear-announce-tones-2861.mp3"
+  beep: "mixkit-clear-announce-tones-2861.wav"
 };
 let audio = null;
 let audioTimeout = null;
@@ -153,7 +153,7 @@ function fitMapToMarkers() {
   map.fitBounds(bounds);
 }
 
-// --- כפתור סאונד ---
+// --- סאונד כפתור ---
 const soundSelect = document.getElementById("sound-select");
 const soundBtn = document.getElementById("sound-btn");
 
@@ -167,33 +167,31 @@ function updateSoundButton() {
 }
 soundSelect.addEventListener("change", updateSoundButton);
 
-function playSound(force=false) {
+// הפעלה/עצירה של סאונד
+function toggleSound() {
   const selected = soundSelect.value;
   if (selected === "none") return;
 
-  // עצור סאונד קיים אם יש
   if (audio) {
     audio.pause();
+    audio = null;
     clearTimeout(audioTimeout);
-    audio = null;
     soundBtn.textContent = "בדוק";
+  } else {
+    audio = new Audio(sounds[selected]);
+    audio.loop = true;
+    audio.play();
+    soundBtn.textContent = "עצור";
+
+    audioTimeout = setTimeout(() => {
+      audio.pause();
+      audio = null;
+      soundBtn.textContent = "בדוק";
+    }, 8000);
   }
-
-  if (!force && alertActive) return; // אם כבר התרעה פעילה ולא מדובר בלחיצה, אל תשמיע
-
-  audio = new Audio(sounds[selected]);
-  audio.loop = true;
-  audio.play();
-  soundBtn.textContent = "עצור";
-
-  audioTimeout = setTimeout(() => {
-    audio.pause();
-    audio = null;
-    soundBtn.textContent = "בדוק";
-  }, 8000);
 }
 
-soundBtn.addEventListener("click", () => playSound(true));
+soundBtn.addEventListener("click", toggleSound);
 
 // --- תאריך ושעה ---
 function updateDateTime() {
@@ -245,7 +243,24 @@ Promise.all([
     const citiesInMessage = Array.from(settlements);
     if (citiesInMessage.length > 0) {
       // עצירת סאונד קיים והתחלה מחדש
-      playSound(true);
+      if (audio) {
+        audio.pause();
+        audio = null;
+        clearTimeout(audioTimeout);
+        soundBtn.textContent = "בדוק";
+      }
+      if (soundSelect.value !== "none") {
+        audio = new Audio(sounds[soundSelect.value]);
+        audio.loop = true;
+        audio.play();
+        soundBtn.textContent = "עצור";
+
+        audioTimeout = setTimeout(() => {
+          audio.pause();
+          audio = null;
+          soundBtn.textContent = "בדוק";
+        }, 8000);
+      }
 
       alertActive = true;
       const alertBox = document.getElementById('alert-box');
@@ -258,6 +273,7 @@ Promise.all([
       }, 10000);
 
       citiesInMessage.forEach(city => {
+
         const coords = cityCoordinates[city];
         if (coords) addFlashingMarker(coords.lat, coords.lng, message);
       });
@@ -270,3 +286,4 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+

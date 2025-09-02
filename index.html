@@ -99,9 +99,13 @@ let map;
 let cityCoordinates = {};
 let validAreas = [];
 let markers = [];
-let cityPolygons = {}; // ← לכל הפוליגונים
+let cityPolygons = {};
+let activePolygons = [];
+let audio = null;
+let audioTimeout = null;
+let alertActive = false;
 
-// סאונדים
+// --- סאונדים ---
 const sounds = {
   calm: "ringtone-021-365652.mp3",
   siren: "israel-siren-sound-2023-made-with-Voicemod.mp3",
@@ -109,11 +113,8 @@ const sounds = {
   alert: "alarm-301729.mp3",
   beep: "mixkit-clear-announce-tones-2861.wav"
 };
-let audio = null;
-let audioTimeout = null;
-let alertActive = false;
 
-// --- מפה והתרעות ---
+// --- מפה ---
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), {
     center: {lat: 31.5, lng: 34.8},
@@ -123,7 +124,7 @@ function initMap() {
   });
 }
 
-// --- פונקציית פלאש למרקרים ---
+// --- פלאש מרקרים ---
 function addFlashingMarker(lat, lng, message) {
   const marker = new google.maps.Marker({position: {lat, lng}, map, title: message});
   markers.push(marker);
@@ -138,36 +139,21 @@ function addFlashingMarker(lat, lng, message) {
     marker.setMap(null);
     clearInterval(flashInterval);
     markers = markers.filter(m => m !== marker);
-    fitMapToMarkersAndPolygons();
   }, 10000);
-
-  fitMapToMarkersAndPolygons();
 }
 
-// --- עדכון זום לפי מרקרים + פוליגונים ---
+// --- זום מתאים למרקרים + פוליגונים ---
 function fitMapToMarkersAndPolygons() {
   const bounds = new google.maps.LatLngBounds();
-  let hasItems = false;
+  let hasAny = false;
 
-  // מרקרים
-  markers.forEach(m => { 
-    bounds.extend(m.getPosition());
-    hasItems = true;
+  markers.forEach(m => { bounds.extend(m.getPosition()); hasAny=true; });
+  activePolygons.forEach(p => {
+    p.getPath().forEach(coord => { bounds.extend(coord); hasAny=true; });
   });
 
-  // פוליגונים
-  Object.values(cityPolygons).forEach(poly => {
-    if (poly.getMap()) {
-      poly.getPath().forEach(latlng => {
-        bounds.extend(latlng);
-        hasItems = true;
-      });
-    }
-  });
-
-  if (hasItems) {
-    map.fitBounds(bounds);
-  } else {
+  if(hasAny) map.fitBounds(bounds);
+  else {
     map.setCenter({lat: 31.5, lng: 34.8});
     map.setZoom(7);
   }
@@ -176,37 +162,21 @@ function fitMapToMarkersAndPolygons() {
 // --- סאונד כפתור ---
 const soundSelect = document.getElementById("sound-select");
 const soundBtn = document.getElementById("sound-btn");
-
 function updateSoundButton() {
-  if (soundSelect.value === "none") {
-    soundBtn.style.display = "none";
-  } else {
-    soundBtn.style.display = "block";
-    soundBtn.textContent = "בדוק";
-  }
+  if (soundSelect.value === "none") soundBtn.style.display="none";
+  else { soundBtn.style.display="block"; soundBtn.textContent="בדוק"; }
 }
 soundSelect.addEventListener("change", updateSoundButton);
 
 function toggleSound() {
   const selected = soundSelect.value;
-  if (selected === "none") return;
+  if(selected==="none") return;
 
-  if (audio) {
-    audio.pause();
-    audio = null;
-    clearTimeout(audioTimeout);
-    soundBtn.textContent = "בדוק";
+  if(audio){
+    audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק";
   } else {
-    audio = new Audio(sounds[selected]);
-    audio.loop = true;
-    audio.play();
-    soundBtn.textContent = "עצור";
-
-    audioTimeout = setTimeout(() => {
-      audio.pause();
-      audio = null;
-      soundBtn.textContent = "בדוק";
-    }, 8000);
+    audio=new Audio(sounds[selected]); audio.loop=true; audio.play(); soundBtn.textContent="עצור";
+    audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
   }
 }
 soundBtn.addEventListener("click", toggleSound);
@@ -214,65 +184,61 @@ soundBtn.addEventListener("click", toggleSound);
 // --- תאריך ושעה ---
 function updateDateTime() {
   const now = new Date();
-  const options = {timeZone: 'Asia/Jerusalem', hour12:false};
-  const dateStr = now.toLocaleDateString('he-IL', options);
-  const timeStr = now.toLocaleTimeString('he-IL', options);
-  document.getElementById("datetime").textContent = `${dateStr} - ${timeStr}`;
+  const options = {timeZone:'Asia/Jerusalem', hour12:false};
+  document.getElementById("datetime").textContent =
+    `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
 }
-setInterval(updateDateTime, 1000);
-updateDateTime();
+setInterval(updateDateTime,1000); updateDateTime();
 
 // --- טעינת JSONs ---
 Promise.all([
   fetch('citiess.json').then(res => res.json()),
   fetch('areas.json').then(res => res.json()),
-  fetch('cleaned_fine.json').then(res => res.json()) // ← טעינת פוליגונים
-])
-.then(([citiesData, areasData, polygonsData]) => {
+  fetch('cleaned_fine.json').then(res => res.json())
+]).then(([citiesData, areasData, polygonsData]) => {
 
-  // --- מיפוי ערים לקואורדינטות ---
-  Object.values(citiesData.cities).forEach(c => {
-    cityCoordinates[c.he] = {lat: c.lat, lng: c.lng};
-  });
+  Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
   validAreas = areasData;
+  if(!map)initMap();
 
-  if (!map) initMap();
-
-  // --- יצירת פוליגונים לכל עיר ---
-  Object.keys(polygonsData).forEach(city => {
-    const pathCoords = polygonsData[city].map(coord => ({lat: coord[0], lng: coord[1]}));
-    cityPolygons[city] = new google.maps.Polygon({
+  // --- יצירת פוליגונים ---
+  Object.keys(polygonsData).forEach(city=>{
+    const pathCoords = polygonsData[city].map(coord=>({lat:coord[0], lng:coord[1]}));
+    const polygon = new google.maps.Polygon({
       paths: pathCoords,
-      strokeColor: '#0000FF',  // כחול מלא
-      strokeOpacity: 1.0,
-      strokeWeight: 2,
-      fillColor: 'red',
-      fillOpacity: 0.4,
-      map: null // לא מציגים עד להתרעה
+      strokeColor: '#000000',
+      strokeOpacity:1.0,
+      strokeWeight:2,
+      fillColor:'red',
+      fillOpacity:0.4,
+      map:null
     });
+    // infoWindow על לחיצה
+    const infoWindow = new google.maps.InfoWindow({content: city});
+    polygon.addListener('click', e=>{ infoWindow.setPosition(e.latLng); infoWindow.open(map); });
+    cityPolygons[city]=polygon;
   });
 
-  // --- שמירת התרעות Firebase ---
-  db.ref("messages").on("child_added", snapshot => {
-    const data = snapshot.val();
-    if (!data || !data.text || !data.timestamp) return;
+  // --- התרעות Firebase ---
+  db.ref("messages").on("child_added", snapshot=>{
+    const data=snapshot.val();
+    if(!data||!data.text||!data.timestamp) return;
 
-    const msgTime = new Date(data.timestamp);
-    const now = new Date();
-    if (now - msgTime > 60*1000) return;
+    const msgTime=new Date(data.timestamp);
+    const now=new Date();
+    if(now-msgTime>60*1000) return;
 
     const message = data.text;
     let settlements = new Set();
 
     // --- חיפוש ערים לפי שורה ---
-    message.split("\n").forEach(line => {
-      if (line.startsWith("•")) {
-        let parts = line.split(":");
-        if (parts.length > 1) {
-          let cities = parts[1].split(",");
-          cities.forEach(city => {
-            let cleanCity = city.replace(/\(.*?\)/g, "").trim();
-            if (validAreas.includes(cleanCity)) settlements.add(cleanCity);
+    message.split("\n").forEach(line=>{
+      if(line.startsWith("•")){
+        let parts=line.split(":");
+        if(parts.length>1){
+          parts[1].split(",").forEach(city=>{
+            let cleanCity=city.replace(/\(.*?\)/g,"").trim();
+            if(validAreas.includes(cleanCity)) settlements.add(cleanCity);
           });
         }
       }
@@ -280,44 +246,53 @@ Promise.all([
 
     // --- חיפוש אזורים משולבים ---
     const combined_areas_pattern = /(שדרות, איבים|אל עמארני, אל מסק|גבים, מכללת ספיר|זמרת, שובה|מבטחים, עמיעוז, ישע|מעגלים, גבעולים, מלילות|צוחר, אוהד|קריית גת, כרמי גת|חיפה - כרמל, הדר ועיר תחתית|חוף כינר, דוגה, דוגית|חוף כורסי, לבנון, חלוקים|חוף גולן, צאלון|אשדוד - א,ב,ד,ה|אשדוד - יא,יב,טו,יז,מרינה,סיטי|אשדוד - ח,ט,י,יג,יד,טז|אשדוד - ג,ו,ז)/g;
-    const matches = message.match(combined_areas_pattern);
-    if (matches) matches.forEach(m => settlements.add(m));
+    const matches=message.match(combined_areas_pattern);
+    if(matches) matches.forEach(m=>settlements.add(m));
 
     const citiesInMessage = Array.from(settlements);
-    if (citiesInMessage.length > 0) {
+    if(citiesInMessage.length>0){
 
-      // --- עצירת סאונד קיים והתחלה מחדש ---
-      if (audio) { audio.pause(); audio = null; clearTimeout(audioTimeout); soundBtn.textContent = "בדוק"; }
-      if (soundSelect.value !== "none") {
-        audio = new Audio(sounds[soundSelect.value]);
-        audio.loop = true;
-        audio.play();
-        soundBtn.textContent = "עצור";
-
-        audioTimeout = setTimeout(() => { audio.pause(); audio = null; soundBtn.textContent = "בדוק"; }, 8000);
+      // --- סאונד ---
+      if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק"; }
+      if(soundSelect.value!=="none"){ audio=new Audio(sounds[soundSelect.value]); audio.loop=true; audio.play(); soundBtn.textContent="עצור";
+        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
       }
 
       // --- הצגת הודעה ---
       alertActive = true;
       const alertBox = document.getElementById('alert-box');
       alertBox.innerHTML = message.replace(/\n/g, "<br>");
-      alertBox.style.display = 'block';
-      setTimeout(() => { alertBox.style.display = 'none'; alertActive = false; }, 10000);
+      alertBox.style.display='block';
+      setTimeout(()=>{ alertBox.style.display='none'; alertActive=false; },10000);
 
-      // --- הצגת פוליגונים + מרקרים ---
-      citiesInMessage.forEach(city => {
-        if (cityPolygons[city]) cityPolygons[city].setMap(map);
+      // --- הצגת מרקרים ופוליגונים ---
+      let currentPolygons = [];
+      citiesInMessage.forEach(city=>{
+        if(cityPolygons[city]){
+          cityPolygons[city].setMap(map);
+          currentPolygons.push(cityPolygons[city]);
+        }
         const coords = cityCoordinates[city];
-        if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+        if(coords) addFlashingMarker(coords.lat, coords.lng, message);
       });
 
-      // --- עדכון זום ---
+      activePolygons.push(...currentPolygons);
       fitMapToMarkersAndPolygons();
+
+      // --- הסרה אחרי 10 שניות ---
+      setTimeout(()=>{
+        markers.forEach(m=>m.setMap(null));
+        markers=[];
+        currentPolygons.forEach(p=>p.setMap(null));
+        activePolygons=activePolygons.filter(p=>!currentPolygons.includes(p));
+        fitMapToMarkersAndPolygons();
+      },10000);
+
     }
+
   });
 
-})
-.catch(err => console.error('Error loading JSON files:', err));
+}).catch(err=>console.error('Error loading JSON files:', err));
 
 window.initMap = initMap;
 </script>

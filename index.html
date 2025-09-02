@@ -30,13 +30,12 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-  <!-- Google Maps JS API עם callback -->
+  <!-- Google Maps JS API -->
   <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaGWR6n5uru3rd4sqtGNR-P-ZiYh5R7XI&language=he&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaGWR6n5uru3rd4sqtGNR-P-ZiYh5R7XI&language=he">
   </script>
 
   <script>
-    // 1️⃣ Firebase Config
     const firebaseConfig = {
       apiKey: "AIzaSyCkrbB17xURNXcJuRv1s6gK2Es-nPXJTIo",
       authDomain: "radar-7c02f.firebaseapp.com",
@@ -49,77 +48,84 @@
     const app = firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2️⃣ הפונקציה הראשית שתופעל אחרי טעינת Google Maps
+    let map;
+    let cityCoordinates = {};
+    let knownCities = [];
+
+    // 1️⃣ יצירת מפה "סטטית" בלי כל כלי עזר
     function initMap() {
-      // יצירת מפה של ישראל
-      const map = new google.maps.Map(document.getElementById('map'), {
+      map = new google.maps.Map(document.getElementById('map'), {
         center: {lat: 31.5, lng: 34.8},
         zoom: 7,
-        mapTypeId: 'roadmap'
+        mapTypeId: 'roadmap',
+        disableDefaultUI: true,      // מסיר את כל הבקרים (זום, מפה לווינית וכו')
+        draggable: false,            // אין גרירה
+        scrollwheel: false,           // אין גלילה עם העכבר
+        disableDoubleClickZoom: true, // אין זום עם דאבל קליק
+        keyboardShortcuts: false      // אין קיצורי מקלדת
+      });
+    }
+
+    function addFlashingMarker(lat, lng, message) {
+      const marker = new google.maps.Marker({
+        position: {lat, lng},
+        map: map,
+        title: message
       });
 
-      // פונקציה להוספת נקודה עם הבהוב
-      function addFlashingMarker(lat, lng, message) {
-        const marker = new google.maps.Marker({
-          position: {lat, lng},
-          map: map,
-          title: message
-        });
+      let visible = true;
+      setInterval(() => {
+        marker.setVisible(visible);
+        visible = !visible;
+      }, 600);
 
-        let visible = true;
-        setInterval(() => {
-          marker.setVisible(visible);
-          visible = !visible;
-        }, 600);
-
-        if (message) {
-          const infowindow = new google.maps.InfoWindow({
-            content: `<div class="info-box">${message}</div>`
-          });
-          marker.addListener("click", () => infowindow.open(map, marker));
-        }
+      if (message) {
+        const infowindow = new google.maps.InfoWindow({content: `<div class="info-box">${message}</div>`});
+        marker.addListener("click", () => infowindow.open(map, marker));
       }
-
-      // פונקציה לחילוץ הערים מתוך ההודעה
-      function extractCities(text, knownCities) {
-        const cities = [];
-        for (const city of knownCities) {
-          if (text.includes(city)) cities.push(city);
-        }
-        return cities;
-      }
-
-      // טעינת קואורדינטות מהקובץ citiess.json
-      fetch('citiess.json')
-        .then(response => response.json())
-        .then(data => {
-          const cityCoordinates = {};
-          const citiesData = data.cities;
-          for (const key in citiesData) {
-            cityCoordinates[citiesData[key].he] = {
-              lat: citiesData[key].lat,
-              lng: citiesData[key].lng
-            };
-          }
-          const knownCities = Object.keys(cityCoordinates);
-
-          // האזנה ל-Firebase בזמן אמת
-          db.ref("messages").on("child_added", snapshot => {
-            const data = snapshot.val();
-            if (!data || !data.message) return;
-
-            const message = data.message;
-            const cities = extractCities(message, knownCities);
-
-            for (const city of cities) {
-              const coords = cityCoordinates[city];
-              if (coords) addFlashingMarker(coords.lat, coords.lng, message);
-            }
-          });
-        })
-        .catch(err => console.error('Error loading cities JSON:', err));
     }
+
+    function extractCities(text, knownCities) {
+      const cities = [];
+      for (const city of knownCities) {
+        if (text.includes(city)) {
+          cities.push(city);
+        }
+      }
+      return cities;
+    }
+
+    // 2️⃣ טעינת הקואורדינטות
+    fetch('citiess.json')
+      .then(response => response.json())
+      .then(data => {
+        const citiesData = data.cities;
+        for (const key in citiesData) {
+          cityCoordinates[citiesData[key].he] = {
+            lat: citiesData[key].lat,
+            lng: citiesData[key].lng
+          };
+        }
+        knownCities = Object.keys(cityCoordinates);
+
+        if (!map) initMap();
+
+        db.ref("messages").on("child_added", snapshot => {
+          const data = snapshot.val();
+          if (!data || !data.text) return;
+
+          const message = data.text;
+          const cities = extractCities(message, knownCities);
+
+          for (const city of cities) {
+            const coords = cityCoordinates[city];
+            if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+          }
+        });
+      })
+      .catch(err => console.error('Error loading cities JSON:', err));
+
+    window.initMap = initMap;
   </script>
 </body>
 </html>
-

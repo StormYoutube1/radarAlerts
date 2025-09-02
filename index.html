@@ -27,11 +27,13 @@
   <div id="map"></div>
 
   <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
 
   <!-- Google Maps JS API -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaGWR6n5uru3rd4sqtGNR-P-ZiYh5R7XI&language=he"></script>
+  <script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaGWR6n5uru3rd4sqtGNR-P-ZiYh5R7XI&language=he"></script>
 
   <script>
     // 1️⃣ Firebase Config
@@ -85,13 +87,13 @@
       return cities;
     }
 
-    // 5️⃣ טעינת קואורדינטות מהקובץ citiess.json
-    let cityCoordinates = {};
-    let knownCities = [];
-
+    // 5️⃣ טעינת קואורדינטות מהקובץ citiess.json והפעלת Firebase לאחר מכן
     fetch('citiess.json')
       .then(response => response.json())
       .then(data => {
+        const cityCoordinates = {};
+        const knownCities = [];
+
         const citiesData = data.cities;
         for (const key in citiesData) {
           cityCoordinates[citiesData[key].he] = {
@@ -99,24 +101,23 @@
             lng: citiesData[key].lng
           };
         }
-        knownCities = Object.keys(cityCoordinates);
+        const knownCitiesArray = Object.keys(cityCoordinates);
+
+        // 6️⃣ האזנה ל-Firebase בזמן אמת רק אחרי טעינת הערים
+        db.ref("alerts").on("child_added", snapshot => {
+          const data = snapshot.val();
+          if (!data || !data.message) return;
+
+          const message = data.message;
+          const cities = extractCities(message, knownCitiesArray);
+
+          for (const city of cities) {
+            const coords = cityCoordinates[city];
+            if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+          }
+        });
       })
       .catch(err => console.error('Error loading cities JSON:', err));
-
-    // 6️⃣ האזנה ל-Firebase בזמן אמת
-    db.ref("alerts").on("child_added", snapshot => {
-      const data = snapshot.val();
-      if (!data || !data.message) return;
-
-      const message = data.message;
-      const cities = extractCities(message, knownCities);
-
-      for (const city of cities) {
-        const coords = cityCoordinates[city];
-        if (coords) addFlashingMarker(coords.lat, coords.lng, message);
-      }
-    });
-
   </script>
 </body>
 </html>

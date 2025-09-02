@@ -35,12 +35,46 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   border: 2px solid #fff;
 }
 .logo-overlay img { width: 100%; height: 100%; object-fit: cover; }
+
+#sound-box {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: #111;
+  color: white;
+  padding: 15px;
+  border-radius: 10px;
+  z-index: 1001;
+  display: block;
+  max-width: 300px;
+}
+#sound-box label, #sound-box select, #sound-box button {
+  display: block;
+  margin-top: 5px;
+}
+#sound-box button {
+  margin-top: 10px;
+}
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div class="logo-overlay"><img src="path_to_original_image.jpg" alt="Logo"></div>
 <div id="alert-box" class="info-box"></div>
+
+<div id="sound-box">
+  <div id="datetime" style="color:white;font-weight:bold;"></div>
+  <label for="sound-select">בחר צליל התרעה:</label>
+  <select id="sound-select">
+    <option value="none" selected>ללא</option>
+    <option value="alert">התרעה</option>
+    <option value="calm">רגוע</option>
+    <option value="siren">אזעקה</option>
+    <option value="homefront">פיקוד העורף</option>
+    <option value="beep">צפצוף</option>
+  </select>
+  <button id="sound-btn" style="display:none;">בדוק</button>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -66,6 +100,19 @@ let cityCoordinates = {};
 let validAreas = [];
 let markers = [];
 
+// סאונדים
+const sounds = {
+  calm: "ringtone-021-365652.mp3",
+  siren: "israel-siren-sound-2023-made-with-Voicemod.mp3",
+  homefront: "eas-alarm-iphone-alarm-262882.mp3",
+  alert: "alarm-301729.mp3",
+  beep: "mixkit-clear-announce-tones-2861.mp3"
+};
+let audio = null;
+let audioTimeout = null;
+let alertActive = false;
+
+// --- מפה והתרעות ---
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), {
     center: {lat: 31.5, lng: 34.8},
@@ -106,19 +153,69 @@ function fitMapToMarkers() {
   map.fitBounds(bounds);
 }
 
-// טעינת JSONs
+// --- כפתור סאונד ---
+const soundSelect = document.getElementById("sound-select");
+const soundBtn = document.getElementById("sound-btn");
+
+function updateSoundButton() {
+  if (soundSelect.value === "none") {
+    soundBtn.style.display = "none";
+  } else {
+    soundBtn.style.display = "block";
+    soundBtn.textContent = "בדוק";
+  }
+}
+soundSelect.addEventListener("change", updateSoundButton);
+
+function playSound(force=false) {
+  const selected = soundSelect.value;
+  if (selected === "none") return;
+
+  // עצור סאונד קיים אם יש
+  if (audio) {
+    audio.pause();
+    clearTimeout(audioTimeout);
+    audio = null;
+    soundBtn.textContent = "בדוק";
+  }
+
+  if (!force && alertActive) return; // אם כבר התרעה פעילה ולא מדובר בלחיצה, אל תשמיע
+
+  audio = new Audio(sounds[selected]);
+  audio.loop = true;
+  audio.play();
+  soundBtn.textContent = "עצור";
+
+  audioTimeout = setTimeout(() => {
+    audio.pause();
+    audio = null;
+    soundBtn.textContent = "בדוק";
+  }, 8000);
+}
+
+soundBtn.addEventListener("click", () => playSound(true));
+
+// --- תאריך ושעה ---
+function updateDateTime() {
+  const now = new Date();
+  const options = {timeZone: 'Asia/Jerusalem', hour12:false};
+  const dateStr = now.toLocaleDateString('he-IL', options);
+  const timeStr = now.toLocaleTimeString('he-IL', options);
+  document.getElementById("datetime").textContent = `${dateStr} - ${timeStr}`;
+}
+setInterval(updateDateTime, 1000);
+updateDateTime();
+
+// --- טעינת JSONs והתרעות ---
 Promise.all([
   fetch('citiess.json').then(res => res.json()),
   fetch('areas.json').then(res => res.json())
 ])
 .then(([citiesData, areasData]) => {
-  // מיפוי שם עיר -> קואורדינטות
   Object.values(citiesData.cities).forEach(c => {
     cityCoordinates[c.he] = {lat: c.lat, lng: c.lng};
   });
-
-  validAreas = areasData; // מערך פשוט ["אבו גוש", ...]
-
+  validAreas = areasData;
   if (!map) initMap();
 
   db.ref("messages").on("child_added", snapshot => {
@@ -132,7 +229,6 @@ Promise.all([
     const message = data.text;
     let settlements = new Set();
 
-    // חילוץ ערים לפי • שם: עיר1, עיר2
     message.split("\n").forEach(line => {
       if (line.startsWith("•")) {
         let parts = line.split(":");
@@ -140,24 +236,26 @@ Promise.all([
           let cities = parts[1].split(",");
           cities.forEach(city => {
             let cleanCity = city.replace(/\(.*?\)/g, "").trim();
-            if (validAreas.includes(cleanCity)) {
-              settlements.add(cleanCity);
-            }
+            if (validAreas.includes(cleanCity)) settlements.add(cleanCity);
           });
         }
       }
     });
 
     const citiesInMessage = Array.from(settlements);
-    console.log("הודעה חדשה:", message);
-    console.log("יישובים זוהו:", citiesInMessage);
-
     if (citiesInMessage.length > 0) {
+      // עצירת סאונד קיים והתחלה מחדש
+      playSound(true);
+
+      alertActive = true;
       const alertBox = document.getElementById('alert-box');
       alertBox.innerHTML = message.replace(/\n/g, "<br>");
       alertBox.style.display = 'block';
 
-      setTimeout(() => { alertBox.style.display = 'none'; }, 10000);
+      setTimeout(() => {
+        alertBox.style.display = 'none';
+        alertActive = false;
+      }, 10000);
 
       citiesInMessage.forEach(city => {
         const coords = cityCoordinates[city];

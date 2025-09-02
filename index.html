@@ -99,6 +99,7 @@ let map;
 let cityCoordinates = {};
 let validAreas = [];
 let markers = [];
+let cityPolygons = {}; // ← לכל הפוליגונים
 
 // סאונדים
 const sounds = {
@@ -122,6 +123,7 @@ function initMap() {
   });
 }
 
+// --- פונקציית פלאש למרקרים ---
 function addFlashingMarker(lat, lng, message) {
   const marker = new google.maps.Marker({position: {lat, lng}, map, title: message});
   markers.push(marker);
@@ -167,7 +169,6 @@ function updateSoundButton() {
 }
 soundSelect.addEventListener("change", updateSoundButton);
 
-// הפעלה/עצירה של סאונד
 function toggleSound() {
   const selected = soundSelect.value;
   if (selected === "none") return;
@@ -190,7 +191,6 @@ function toggleSound() {
     }, 8000);
   }
 }
-
 soundBtn.addEventListener("click", toggleSound);
 
 // --- תאריך ושעה ---
@@ -204,18 +204,37 @@ function updateDateTime() {
 setInterval(updateDateTime, 1000);
 updateDateTime();
 
-// --- טעינת JSONs והתרעות ---
+// --- טעינת JSONs ---
 Promise.all([
   fetch('citiess.json').then(res => res.json()),
-  fetch('areas.json').then(res => res.json())
+  fetch('areas.json').then(res => res.json()),
+  fetch('cleaned_fine.json').then(res => res.json()) // ← טעינת פוליגונים
 ])
-.then(([citiesData, areasData]) => {
+.then(([citiesData, areasData, polygonsData]) => {
+
+  // --- מיפוי ערים לקואורדינטות ---
   Object.values(citiesData.cities).forEach(c => {
     cityCoordinates[c.he] = {lat: c.lat, lng: c.lng};
   });
   validAreas = areasData;
+
   if (!map) initMap();
 
+  // --- יצירת פוליגונים לכל עיר ---
+  Object.keys(polygonsData).forEach(city => {
+    const pathCoords = polygonsData[city].map(coord => ({lat: coord[0], lng: coord[1]}));
+    cityPolygons[city] = new google.maps.Polygon({
+      paths: pathCoords,
+      strokeColor: '#0000FF',
+      strokeOpacity: 1.0,
+      strokeWeight: 2,
+      fillColor: 'red',
+      fillOpacity: 0.4,
+      map: null // לא מציגים עד להתרעה
+    });
+  });
+
+  // --- שמירת התרעות Firebase ---
   db.ref("messages").on("child_added", snapshot => {
     const data = snapshot.val();
     if (!data || !data.text || !data.timestamp) return;
@@ -227,6 +246,7 @@ Promise.all([
     const message = data.text;
     let settlements = new Set();
 
+    // --- חיפוש ערים לפי שורה ---
     message.split("\n").forEach(line => {
       if (line.startsWith("•")) {
         let parts = line.split(":");
@@ -239,14 +259,18 @@ Promise.all([
         }
       }
     });
+
+    // --- חיפוש אזורים משולבים ---
     const combined_areas_pattern = /(שדרות, איבים|אל עמארני, אל מסק|גבים, מכללת ספיר|זמרת, שובה|מבטחים, עמיעוז, ישע|מעגלים, גבעולים, מלילות|צוחר, אוהד|קריית גת, כרמי גת|חיפה - כרמל, הדר ועיר תחתית|חוף כינר, דוגה, דוגית|חוף כורסי, לבנון, חלוקים|חוף גולן, צאלון|אשדוד - א,ב,ד,ה|אשדוד - יא,יב,טו,יז,מרינה,סיטי|אשדוד - ח,ט,י,יג,יד,טז|אשדוד - ג,ו,ז)/g;
     const matches = message.match(combined_areas_pattern);
     if (matches) {
       matches.forEach(m => settlements.add(m));
     }
+
     const citiesInMessage = Array.from(settlements);
     if (citiesInMessage.length > 0) {
-      // עצירת סאונד קיים והתחלה מחדש
+
+      // --- עצירת סאונד קיים והתחלה מחדש ---
       if (audio) {
         audio.pause();
         audio = null;
@@ -266,23 +290,28 @@ Promise.all([
         }, 8000);
       }
 
+      // --- הצגת הודעה ---
       alertActive = true;
       const alertBox = document.getElementById('alert-box');
       alertBox.innerHTML = message.replace(/\n/g, "<br>");
       alertBox.style.display = 'block';
-
       setTimeout(() => {
         alertBox.style.display = 'none';
         alertActive = false;
       }, 10000);
 
+      // --- הצגת פוליגונים / מרקרים ---
       citiesInMessage.forEach(city => {
-
-        const coords = cityCoordinates[city];
-        if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+        if (cityPolygons[city]) {
+          cityPolygons[city].setMap(map);
+        } else {
+          const coords = cityCoordinates[city];
+          if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+        }
       });
     }
   });
+
 })
 .catch(err => console.error('Error loading JSON files:', err));
 
@@ -290,6 +319,3 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-
-
-

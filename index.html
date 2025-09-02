@@ -63,7 +63,7 @@ const db = firebase.database();
 
 let map;
 let cityCoordinates = {};
-let knownCities = [];
+let validAreas = [];
 let markers = [];
 
 function initMap() {
@@ -106,48 +106,67 @@ function fitMapToMarkers() {
   map.fitBounds(bounds);
 }
 
-// טעינת קואורדינטות
-fetch('citiess.json')
-  .then(response => response.json())
-  .then(data => {
-    const citiesData = data.cities;
-    for (const key in citiesData) {
-      cityCoordinates[citiesData[key].he] = {
-        lat: citiesData[key].lat,
-        lng: citiesData[key].lng
-      };
-    }
-    knownCities = Object.keys(cityCoordinates);
-    if (!map) initMap();
+// טעינת JSONs
+Promise.all([
+  fetch('citiess.json').then(res => res.json()),
+  fetch('areas.json').then(res => res.json())
+])
+.then(([citiesData, areasData]) => {
+  // מיפוי שם עיר -> קואורדינטות
+  Object.values(citiesData.cities).forEach(c => {
+    cityCoordinates[c.he] = {lat: c.lat, lng: c.lng};
+  });
 
-    db.ref("messages").on("child_added", snapshot => {
-      const data = snapshot.val();
-      if (!data || !data.text || !data.timestamp) return;
+  validAreas = areasData; // מערך פשוט ["אבו גוש", ...]
 
-      const msgTime = new Date(data.timestamp);
-      const now = new Date();
-      if (now - msgTime > 60*1000) return;
+  if (!map) initMap();
 
-      const message = data.text;
-      const citiesInMessage = knownCities.filter(city => message.includes(city));
-      console.log("הודעה חדשה:", message);
-      console.log("ערים זוהו:", citiesInMessage);
+  db.ref("messages").on("child_added", snapshot => {
+    const data = snapshot.val();
+    if (!data || !data.text || !data.timestamp) return;
 
-      if (citiesInMessage.length > 0) {
-        const alertBox = document.getElementById('alert-box');
-        alertBox.innerHTML = message.replace(/\n/g, "<br>");
-        alertBox.style.display = 'block';
+    const msgTime = new Date(data.timestamp);
+    const now = new Date();
+    if (now - msgTime > 60*1000) return;
 
-        setTimeout(() => { alertBox.style.display = 'none'; }, 10000);
+    const message = data.text;
+    let settlements = new Set();
 
-        citiesInMessage.forEach(city => {
-          const coords = cityCoordinates[city];
-          if (coords) addFlashingMarker(coords.lat, coords.lng, message);
-        });
+    // חילוץ ערים לפי • שם: עיר1, עיר2
+    message.split("\n").forEach(line => {
+      if (line.startsWith("•")) {
+        let parts = line.split(":");
+        if (parts.length > 1) {
+          let cities = parts[1].split(",");
+          cities.forEach(city => {
+            let cleanCity = city.replace(/\(.*?\)/g, "").trim();
+            if (validAreas.includes(cleanCity)) {
+              settlements.add(cleanCity);
+            }
+          });
+        }
       }
     });
-  })
-  .catch(err => console.error('Error loading cities JSON:', err));
+
+    const citiesInMessage = Array.from(settlements);
+    console.log("הודעה חדשה:", message);
+    console.log("יישובים זוהו:", citiesInMessage);
+
+    if (citiesInMessage.length > 0) {
+      const alertBox = document.getElementById('alert-box');
+      alertBox.innerHTML = message.replace(/\n/g, "<br>");
+      alertBox.style.display = 'block';
+
+      setTimeout(() => { alertBox.style.display = 'none'; }, 10000);
+
+      citiesInMessage.forEach(city => {
+        const coords = cityCoordinates[city];
+        if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+      });
+    }
+  });
+})
+.catch(err => console.error('Error loading JSON files:', err));
 
 window.initMap = initMap;
 </script>

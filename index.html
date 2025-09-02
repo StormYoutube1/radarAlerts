@@ -5,16 +5,8 @@
 <title>מפת התרעות ישראל</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-html, body {
-  height: 100%;
-  margin: 0;
-  font-family: Arial, sans-serif;
-  direction: rtl;
-}
-#map {
-  height: 100%;
-  width: 100%;
-}
+html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction: rtl; }
+#map { height: 100%; width: 100%; }
 .info-box {
   position: absolute;
   bottom: 20px;
@@ -23,12 +15,13 @@ html, body {
   color: white;
   padding: 10px;
   border-radius: 8px;
-  max-width: 350px;
+  max-width: 400px;
   line-height: 1.4em;
   z-index: 1000;
+  display: none;
+  overflow-y: auto;
+  max-height: 200px;
 }
-.info-box u { text-decoration: underline; font-weight: bold; }
-.info-box i { font-style: italic; }
 .logo-overlay {
   position: absolute;
   top: 10px;
@@ -47,7 +40,7 @@ html, body {
 <body>
 <div id="map"></div>
 <div class="logo-overlay"><img src="path_to_original_image.jpg" alt="Logo"></div>
-<div id="alert-box" class="info-box" style="display:none;"></div>
+<div id="alert-box" class="info-box"></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -56,7 +49,6 @@ html, body {
 </script>
 
 <script>
-// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyCkrbB17xURNXcJuRv1s6gK2Es-nPXJTIo",
   authDomain: "radar-7c02f.firebaseapp.com",
@@ -79,11 +71,7 @@ function initMap() {
     center: {lat: 31.5, lng: 34.8},
     zoom: 7,
     mapTypeId: 'roadmap',
-    disableDefaultUI: true,
-    draggable: true,
-    scrollwheel: true,
-    disableDoubleClickZoom: false,
-    keyboardShortcuts: true
+    disableDefaultUI: true
   });
 }
 
@@ -91,7 +79,6 @@ function addFlashingMarker(lat, lng, message) {
   const marker = new google.maps.Marker({position: {lat, lng}, map, title: message});
   markers.push(marker);
 
-  // הבהוב
   let visible = true;
   const flashInterval = setInterval(() => {
     marker.setVisible(visible);
@@ -139,27 +126,24 @@ fetch('citiess.json')
 
       const msgTime = new Date(data.timestamp);
       const now = new Date();
-      if (now - msgTime > 60*1000) return; // רק דקה אחרונה
+      if (now - msgTime > 60*1000) return;
 
       const message = data.text;
-      const cities = knownCities.filter(city => message.includes(city));
+      const citiesInMessage = knownCities.filter(city => message.includes(city));
       console.log("הודעה חדשה:", message);
-      console.log("ערים זוהו:", cities);
-      
-      if(cities.length > 0){
-        const alertBox = document.getElementById('alert-box');
-        // עיבוד טקסט HTML
-        let htmlMessage = `<u>התרעה</u><br><br><i>${msgTime.toLocaleDateString('he-IL')} - ${msgTime.toLocaleTimeString('he-IL', {hour: '2-digit', minute:'2-digit'})}</i><br>`;
-        cities.forEach(city => {
-          htmlMessage += `• ${city}<br>`;
-        });
-        alertBox.innerHTML = htmlMessage;
-        alertBox.style.display = 'block';
-      }
+      console.log("ערים זוהו:", citiesInMessage);
 
-      for (const city of cities) {
-        const coords = cityCoordinates[city];
-        if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+      if (citiesInMessage.length > 0) {
+        const alertBox = document.getElementById('alert-box');
+        alertBox.innerHTML = message.replace(/\n/g, "<br>");
+        alertBox.style.display = 'block';
+
+        setTimeout(() => { alertBox.style.display = 'none'; }, 10000);
+
+        citiesInMessage.forEach(city => {
+          const coords = cityCoordinates[city];
+          if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+        });
       }
     });
   })

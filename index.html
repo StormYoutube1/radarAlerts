@@ -16,20 +16,45 @@
       width: 100%;
     }
     .info-box {
-      background: rgba(255,255,255,0.9);
+      background: black;
+      color: white;
       padding: 10px;
-      border-radius: 5px;
+      border-radius: 8px;
+      max-width: 300px;
+      line-height: 1.4em;
+    }
+    .info-box u {
+      text-decoration: underline;
+      font-weight: bold;
+    }
+    .info-box i {
+      font-style: italic;
+    }
+    .logo-overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      overflow: hidden;
+      z-index: 1000;
+      pointer-events: none;
+      border: 2px solid #fff;
+    }
+    .logo-overlay img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
   </style>
 </head>
 <body>
 <div id="map"></div>
+<div class="logo-overlay"><img src="path_to_original_image.jpg" alt="Logo"></div>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-
-<!-- Google Maps JS API -->
 <script async defer
   src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaGWR6n5uru3rd4sqtGNR-P-ZiYh5R7XI&language=he">
 </script>
@@ -50,9 +75,7 @@ const db = firebase.database();
 let map;
 let cityCoordinates = {};
 let knownCities = [];
-let currentMarker = null;
-let flashInterval = null;
-const FLASH_DURATION = 10000; // 10 שניות
+let markers = [];
 
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), {
@@ -60,53 +83,53 @@ function initMap() {
     zoom: 7,
     mapTypeId: 'roadmap',
     disableDefaultUI: true,
-    draggable: false,
-    scrollwheel: false,
-    disableDoubleClickZoom: true,
-    keyboardShortcuts: false
+    draggable: true,
+    scrollwheel: true,
+    disableDoubleClickZoom: false,
+    keyboardShortcuts: true
   });
 }
 
 function addFlashingMarker(lat, lng, message) {
-  if (currentMarker) currentMarker.setMap(null);
-  if (flashInterval) clearInterval(flashInterval);
+  const marker = new google.maps.Marker({position: {lat, lng}, map, title: message});
+  markers.push(marker);
 
-  currentMarker = new google.maps.Marker({
-    position: {lat, lng},
-    map: map,
-    title: message
+  const infowindow = new google.maps.InfoWindow({
+    content: `<div class="info-box">${message}</div>`
   });
+  marker.addListener("click", () => infowindow.open(map, marker));
 
+  // הבהוב
   let visible = true;
-  flashInterval = setInterval(() => {
-    currentMarker.setVisible(visible);
+  const flashInterval = setInterval(() => {
+    marker.setVisible(visible);
     visible = !visible;
   }, 600);
 
-  const infowindow = new google.maps.InfoWindow({content: `<div class="info-box">${message}</div>`});
-  currentMarker.addListener("click", () => infowindow.open(map, currentMarker));
-
-  // זום למיקום ההתרעה
-  map.setCenter({lat, lng});
-  map.setZoom(12);
-
-  // הסרת ההתרעה אחרי 10 שניות וחזרה למפה רגילה
   setTimeout(() => {
-    if (currentMarker) currentMarker.setMap(null);
-    if (flashInterval) clearInterval(flashInterval);
-    currentMarker = null;
-    flashInterval = null;
-    map.setCenter({lat: 31.5, lng: 34.8});
-    map.setZoom(7);
-  }, FLASH_DURATION);
+    marker.setMap(null);
+    clearInterval(flashInterval);
+    markers = markers.filter(m => m !== marker);
+    fitMapToMarkers();
+  }, 10000);
+
+  fitMapToMarkers();
 }
 
-function extractCities(text, knownCities) {
-  const cities = [];
-  for (const city of knownCities) {
-    if (text.includes(city)) cities.push(city);
+function fitMapToMarkers() {
+  if (markers.length === 0) {
+    map.setCenter({lat: 31.5, lng: 34.8});
+    map.setZoom(7);
+    return;
   }
-  return cities;
+  const bounds = new google.maps.LatLngBounds();
+  markers.forEach(m => bounds.extend(m.getPosition()));
+  map.fitBounds(bounds);
+}
+
+// חיפוש ערים בטקסט
+function extractCities(text, knownCities) {
+  return knownCities.filter(city => text.includes(city));
 }
 
 // טעינת קואורדינטות
@@ -121,18 +144,15 @@ fetch('citiess.json')
       };
     }
     knownCities = Object.keys(cityCoordinates);
-
     if (!map) initMap();
 
     db.ref("messages").on("child_added", snapshot => {
       const data = snapshot.val();
       if (!data || !data.text || !data.timestamp) return;
 
-      // בדיקה אם ההודעה מהדקה האחרונה בישראל (UTC+3)
       const msgTime = new Date(data.timestamp);
       const now = new Date();
-      const diffMs = now - msgTime; // במילישניות
-      if (diffMs > 60*1000) return; // רק דקה אחרונה
+      if (now - msgTime > 60*1000) return; // רק דקה אחרונה
 
       const message = data.text;
       const cities = extractCities(message, knownCities);

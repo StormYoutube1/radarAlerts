@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>מפת התרעות ישראל</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      direction: rtl;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    .info-box {
+      background: rgba(255,255,255,0.9);
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js"></script>
+
+  <!-- Google Maps JS API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaGWR6n5uru3rd4sqtGNR-P-ZiYh5R7XI&language=he"></script>
+
+  <script>
+    // 1️⃣ Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCkrbB17xURNXcJuRv1s6gK2Es-nPXJTIo",
+      authDomain: "radar-7c02f.firebaseapp.com",
+      databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com",
+      projectId: "radar-7c02f",
+      storageBucket: "radar-7c02f.firebasestorage.app",
+      messagingSenderId: "985232578682",
+      appId: "1:985232578682:web:f9e4326411aced7c4583c3",
+    };
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // 2️⃣ יצירת מפה של ישראל
+    const map = new google.maps.Map(document.getElementById('map'), {
+      center: {lat: 31.5, lng: 34.8},
+      zoom: 7,
+      mapTypeId: 'roadmap'
+    });
+
+    // 3️⃣ פונקציה להוספת נקודה עם הבהוב
+    function addFlashingMarker(lat, lng, message) {
+      const marker = new google.maps.Marker({
+        position: {lat, lng},
+        map: map,
+        title: message
+      });
+
+      let visible = true;
+      setInterval(() => {
+        marker.setVisible(visible);
+        visible = !visible;
+      }, 600);
+
+      if (message) {
+        const infowindow = new google.maps.InfoWindow({content: `<div class="info-box">${message}</div>`});
+        marker.addListener("click", () => infowindow.open(map, marker));
+      }
+    }
+
+    // 4️⃣ פונקציה לחילוץ הערים מתוך ההודעה
+    function extractCities(text, knownCities) {
+      const cities = [];
+      for (const city of knownCities) {
+        if (text.includes(city)) {
+          cities.push(city);
+        }
+      }
+      return cities;
+    }
+
+    // 5️⃣ טעינת קואורדינטות מהקובץ citiess.json
+    let cityCoordinates = {};
+    let knownCities = [];
+
+    fetch('citiess.json')
+      .then(response => response.json())
+      .then(data => {
+        const citiesData = data.cities;
+        for (const key in citiesData) {
+          cityCoordinates[citiesData[key].he] = {
+            lat: citiesData[key].lat,
+            lng: citiesData[key].lng
+          };
+        }
+        knownCities = Object.keys(cityCoordinates);
+      })
+      .catch(err => console.error('Error loading cities JSON:', err));
+
+    // 6️⃣ האזנה ל-Firebase בזמן אמת
+    db.ref("alerts").on("child_added", snapshot => {
+      const data = snapshot.val();
+      if (!data || !data.message) return;
+
+      const message = data.message;
+      const cities = extractCities(message, knownCities);
+
+      for (const city of cities) {
+        const coords = cityCoordinates[city];
+        if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+      }
+    });
+
+  </script>
+</body>
+</html>

@@ -138,21 +138,39 @@ function addFlashingMarker(lat, lng, message) {
     marker.setMap(null);
     clearInterval(flashInterval);
     markers = markers.filter(m => m !== marker);
-    fitMapToMarkers();
+    fitMapToMarkersAndPolygons();
   }, 10000);
 
-  fitMapToMarkers();
+  fitMapToMarkersAndPolygons();
 }
 
-function fitMapToMarkers() {
-  if (markers.length === 0) {
+// --- עדכון זום לפי מרקרים + פוליגונים ---
+function fitMapToMarkersAndPolygons() {
+  const bounds = new google.maps.LatLngBounds();
+  let hasItems = false;
+
+  // מרקרים
+  markers.forEach(m => { 
+    bounds.extend(m.getPosition());
+    hasItems = true;
+  });
+
+  // פוליגונים
+  Object.values(cityPolygons).forEach(poly => {
+    if (poly.getMap()) {
+      poly.getPath().forEach(latlng => {
+        bounds.extend(latlng);
+        hasItems = true;
+      });
+    }
+  });
+
+  if (hasItems) {
+    map.fitBounds(bounds);
+  } else {
     map.setCenter({lat: 31.5, lng: 34.8});
     map.setZoom(7);
-    return;
   }
-  const bounds = new google.maps.LatLngBounds();
-  markers.forEach(m => bounds.extend(m.getPosition()));
-  map.fitBounds(bounds);
 }
 
 // --- סאונד כפתור ---
@@ -225,7 +243,7 @@ Promise.all([
     const pathCoords = polygonsData[city].map(coord => ({lat: coord[0], lng: coord[1]}));
     cityPolygons[city] = new google.maps.Polygon({
       paths: pathCoords,
-      strokeColor: '#0000FF',
+      strokeColor: '#0000FF',  // כחול מלא
       strokeOpacity: 1.0,
       strokeWeight: 2,
       fillColor: 'red',
@@ -263,31 +281,20 @@ Promise.all([
     // --- חיפוש אזורים משולבים ---
     const combined_areas_pattern = /(שדרות, איבים|אל עמארני, אל מסק|גבים, מכללת ספיר|זמרת, שובה|מבטחים, עמיעוז, ישע|מעגלים, גבעולים, מלילות|צוחר, אוהד|קריית גת, כרמי גת|חיפה - כרמל, הדר ועיר תחתית|חוף כינר, דוגה, דוגית|חוף כורסי, לבנון, חלוקים|חוף גולן, צאלון|אשדוד - א,ב,ד,ה|אשדוד - יא,יב,טו,יז,מרינה,סיטי|אשדוד - ח,ט,י,יג,יד,טז|אשדוד - ג,ו,ז)/g;
     const matches = message.match(combined_areas_pattern);
-    if (matches) {
-      matches.forEach(m => settlements.add(m));
-    }
+    if (matches) matches.forEach(m => settlements.add(m));
 
     const citiesInMessage = Array.from(settlements);
     if (citiesInMessage.length > 0) {
 
       // --- עצירת סאונד קיים והתחלה מחדש ---
-      if (audio) {
-        audio.pause();
-        audio = null;
-        clearTimeout(audioTimeout);
-        soundBtn.textContent = "בדוק";
-      }
+      if (audio) { audio.pause(); audio = null; clearTimeout(audioTimeout); soundBtn.textContent = "בדוק"; }
       if (soundSelect.value !== "none") {
         audio = new Audio(sounds[soundSelect.value]);
         audio.loop = true;
         audio.play();
         soundBtn.textContent = "עצור";
 
-        audioTimeout = setTimeout(() => {
-          audio.pause();
-          audio = null;
-          soundBtn.textContent = "בדוק";
-        }, 8000);
+        audioTimeout = setTimeout(() => { audio.pause(); audio = null; soundBtn.textContent = "בדוק"; }, 8000);
       }
 
       // --- הצגת הודעה ---
@@ -295,20 +302,17 @@ Promise.all([
       const alertBox = document.getElementById('alert-box');
       alertBox.innerHTML = message.replace(/\n/g, "<br>");
       alertBox.style.display = 'block';
-      setTimeout(() => {
-        alertBox.style.display = 'none';
-        alertActive = false;
-      }, 10000);
+      setTimeout(() => { alertBox.style.display = 'none'; alertActive = false; }, 10000);
 
-      // --- הצגת פוליגונים / מרקרים ---
+      // --- הצגת פוליגונים + מרקרים ---
       citiesInMessage.forEach(city => {
-        if (cityPolygons[city]) {
-          cityPolygons[city].setMap(map);
-        } else {
-          const coords = cityCoordinates[city];
-          if (coords) addFlashingMarker(coords.lat, coords.lng, message);
-        }
+        if (cityPolygons[city]) cityPolygons[city].setMap(map);
+        const coords = cityCoordinates[city];
+        if (coords) addFlashingMarker(coords.lat, coords.lng, message);
       });
+
+      // --- עדכון זום ---
+      fitMapToMarkersAndPolygons();
     }
   });
 

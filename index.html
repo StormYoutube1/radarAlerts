@@ -239,7 +239,11 @@ Promise.all([
         }
       }
     });
-
+    const combined_areas_pattern = /(\bשדרות, איבים\b|\bאל עמארני, אל מסק\b|\bגבים, מכללת ספיר\b|\bזמרת, שובה\b|\bמבטחים, עמיעוז, ישע\b|\bמעגלים, גבעולים, מלילות\b|\bצוחר, אוהד\b|\bקריית גת, כרמי גת\b|\bחיפה - כרמל, הדר ועיר תחתית\b|\bחוף כינר, דוגה, דוגית\b|\bחוף כורסי, לבנון, חלוקים\b|\bחוף גולן, צאלון\b|\bאשדוד - א,ב,ד,ה\b|\bאשדוד - יא,יב,טו,יז,מרינה,סיטי\b|\bאשדוד - ח,ט,י,יג,יד,טז\b|\bאשדוד - ג,ו,ז\b)/g;
+    const matches = message.match(combined_areas_pattern);
+    if (matches) {
+      matches.forEach(m => settlements.add(m));
+    }
     const citiesInMessage = Array.from(settlements);
     if (citiesInMessage.length > 0) {
       // עצירת סאונד קיים והתחלה מחדש
@@ -286,4 +290,5 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+
 

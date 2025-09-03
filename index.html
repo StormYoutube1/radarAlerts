@@ -60,7 +60,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 </head>
 <body>
 <div id="map"></div>
-<div class="logo-overlay"><img src="path_to_original_image.jpg" alt="Logo"></div>
+<div class="logo-overlay"><img src="cropped_circle_image.png" alt="Logo"></div>
 <div id="alert-box" class="info-box"></div>
 
 <div id="sound-box">
@@ -75,6 +75,11 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     <option value="beep">צפצוף</option>
   </select>
   <button id="sound-btn" style="display:none;">בדוק</button>
+
+  <!-- --- הוספה: תיבת הרשאה להתראות --- -->
+  <label style="margin-top:10px;cursor:pointer;">
+    <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
+  </label>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -105,31 +110,70 @@ let activePolygons = [];
 let audio = null;
 let audioTimeout = null;
 let alertActive = false;
-let desktopPermissionGranted = false;
 
-// --- בקשת הרשאות התראות ---
-if ("Notification" in window) {
-  const notificationBox = document.createElement("div");
-  notificationBox.style.position = "absolute";
-  notificationBox.style.bottom = "10px";
-  notificationBox.style.left = "10px";
-  notificationBox.style.background = "#111";
-  notificationBox.style.color = "white";
-  notificationBox.style.padding = "8px";
-  notificationBox.style.borderRadius = "8px";
-  notificationBox.style.zIndex = "1002";
-  notificationBox.innerHTML = `<label style="cursor:pointer;"><input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות</label>`;
-  document.body.appendChild(notificationBox);
-  const checkbox = document.getElementById("notifyPermission");
-  checkbox.addEventListener("change", () => {
-    if (checkbox.checked) {
-      Notification.requestPermission().then(permission => {
-        desktopPermissionGranted = permission === "granted";
-      });
-    } else {
-      desktopPermissionGranted = false;
+// --- סאונדים ---
+const sounds = {
+  calm: "calm.mp3",
+  siren: "alert.mp3",
+  homefront: "homefront.mp3",
+  alert: "siren.mp3",
+  beep: "beep.wav"
+};
+
+// --- הרשאת התראות ---
+let desktopPermissionGranted = false;
+document.getElementById("notifyPermission").addEventListener("change", function() {
+  if (this.checked && "Notification" in window) {
+    Notification.requestPermission().then(permission => {
+      desktopPermissionGranted = permission === "granted";
+    });
+  } else {
+    desktopPermissionGranted = false;
+  }
+});
+
+// --- הצגת התראה בדסקטופ ---
+function showDesktopNotification(message, citiesInMessage, citiesData) {
+  if (!desktopPermissionGranted) return;
+
+  // כותרת מהשורה הראשונה
+  const firstLine = message.split("\n").find(l => l.trim() !== "");
+  const title = firstLine || "🚨 התרעה";
+
+  // אזורים
+  const areasSet = new Set();
+  citiesInMessage.forEach(city => {
+    const cityObj = Object.values(citiesData.cities).find(c => c.he === city);
+    if (cityObj && cityObj.area) {
+      const areaId = cityObj.area;
+      const areaName = citiesData.areas[areaId]?.he;
+      if (areaName) areasSet.add(areaName);
     }
   });
+
+  const areasList = Array.from(areasSet).sort((a,b)=> a.localeCompare(b, 'he')).join(", ");
+
+  // תאריך ושעה
+  const now = new Date();
+  const options = { timeZone: 'Asia/Jerusalem', hour12:false };
+  const dateTimeStr = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
+
+  // גוף ההודעה
+  const body = `${areasList}\n\n${dateTimeStr}\n\nרדאר 📡 - צבע אדום`;
+
+  // --- לוג ---
+  console.log("📡 Desktop Notification נבנה:");
+  console.log("כותרת:", title);
+  console.log("אזורים:", areasList);
+  console.log("תאריך/שעה:", dateTimeStr);
+
+  // יצירת ההתראה
+  const notification = new Notification(title, {
+    body: body,
+    icon: 'cropped_circle_image.png'
+  });
+
+  notification.onclick = () => window.focus();
 }
 
 // --- מפה ---
@@ -160,6 +204,23 @@ function addFlashingMarker(lat, lng, message) {
   }, 10000);
 }
 
+// --- זום מתאים למרקרים + פוליגונים ---
+function fitMapToMarkersAndPolygons() {
+  const bounds = new google.maps.LatLngBounds();
+  let hasAny = false;
+
+  markers.forEach(m => { bounds.extend(m.getPosition()); hasAny=true; });
+  activePolygons.forEach(p => {
+    p.getPath().forEach(coord => { bounds.extend(coord); hasAny=true; });
+  });
+
+  if(hasAny) map.fitBounds(bounds);
+  else {
+    map.setCenter({lat: 31.5, lng: 34.8});
+    map.setZoom(7);
+  }
+}
+
 // --- סאונד כפתור ---
 const soundSelect = document.getElementById("sound-select");
 const soundBtn = document.getElementById("sound-btn");
@@ -172,6 +233,7 @@ soundSelect.addEventListener("change", updateSoundButton);
 function toggleSound() {
   const selected = soundSelect.value;
   if(selected==="none") return;
+
   if(audio){
     audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק";
   } else {
@@ -180,15 +242,6 @@ function toggleSound() {
   }
 }
 soundBtn.addEventListener("click", toggleSound);
-
-// --- סאונדים ---
-const sounds = {
-  calm: "calm.mp3",
-  siren: "alert.mp3",
-  homefront: "homefront.mp3",
-  alert: "siren.mp3",
-  beep: "beep.wav"
-};
 
 // --- תאריך ושעה ---
 function updateDateTime() {
@@ -234,7 +287,7 @@ Promise.all([
     });
     cityPolygons[city] = polygon;
   });
-
+    
   // --- התרעות Firebase ---
   db.ref("messages").on("child_added", snapshot=>{
     const data=snapshot.val();
@@ -261,50 +314,23 @@ Promise.all([
     });
 
     const citiesInMessage = Array.from(settlements);
-
     if(citiesInMessage.length>0){
-      // --- ניתוח אזורים ובניית הודעה ---
-      const areasSet = new Set();
-      citiesInMessage.forEach(city=>{
-        const cityObj = Object.values(citiesData.cities).find(c => c.he===city);
-        if(cityObj && cityObj.area){
-          const areaId = cityObj.area;
-          const areaName = citiesData.areas[areaId]?.he;
-          if(areaName) areasSet.add(areaName);
-        }
-      });
 
-      const areasList = Array.from(areasSet).sort((a,b)=>a.localeCompare(b,'he')).join(", ");
-      console.log("ערים:", citiesInMessage);
-      console.log("אזורים:", areasList);
-
-      // --- כותרת ---
-      const firstLine = message.split("\n").find(l => l.trim() !== "");
-      const title = firstLine || "🚨 התרעה";
-
-      // --- תאריך ושעה ---
-      const now = new Date();
-      const options = { timeZone: 'Asia/Jerusalem', hour12:false };
-      const dateTimeStr = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
-
-      // --- תוכן חלון ---
-      const bodyText = `${areasList}\n\n${dateTimeStr}\n\nרדאר 📡 - צבע אדום`;
-      console.log("תוכן חלון:", bodyText);
-
-      // --- הצגת Desktop Notification ---
-      if(desktopPermissionGranted){
-        const notification = new Notification(title, {
-          body: bodyText,
-          icon: 'cropped_circle_image.png'
-        });
-        notification.onclick = ()=>window.focus();
-      }
+      // --- התראה בדסקטופ (אם המשתמש לחץ) ---
+      showDesktopNotification(message, citiesInMessage, citiesData);
 
       // --- סאונד ---
       if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק"; }
       if(soundSelect.value!=="none"){ audio=new Audio(sounds[soundSelect.value]); audio.loop=true; audio.play(); soundBtn.textContent="עצור";
         audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
       }
+
+      // --- הצגת הודעה בתיבה ---
+      alertActive = true;
+      const alertBox = document.getElementById('alert-box');
+      alertBox.innerHTML = message.replace(/\n/g, "<br>");
+      alertBox.style.display='block';
+      setTimeout(()=>{ alertBox.style.display='none'; alertActive=false; },10000);
 
       // --- הצגת מרקרים ופוליגונים ---
       let currentPolygons = [];
@@ -316,6 +342,7 @@ Promise.all([
         const coords = cityCoordinates[city];
         if(coords) addFlashingMarker(coords.lat, coords.lng, message);
       });
+
       activePolygons.push(...currentPolygons);
       fitMapToMarkersAndPolygons();
 
@@ -329,21 +356,12 @@ Promise.all([
       },10000);
 
     }
+
   });
 
 }).catch(err=>console.error('Error loading JSON files:', err));
 
 window.initMap = initMap;
-
-// --- זום מתאים למרקרים + פוליגונים ---
-function fitMapToMarkersAndPolygons() {
-  const bounds = new google.maps.LatLngBounds();
-  let hasAny = false;
-  markers.forEach(m => { bounds.extend(m.getPosition()); hasAny=true; });
-  activePolygons.forEach(p => p.getPath().forEach(coord => { bounds.extend(coord); hasAny=true; }));
-  if(hasAny) map.fitBounds(bounds);
-  else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
-}
 </script>
 </body>
 </html>

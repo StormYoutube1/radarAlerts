@@ -169,7 +169,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let map, cityCoordinates = {}, validAreas = [], markers = [], cityPolygons = {}, activePolygons = [], audio = null, audioTimeout = null, alertActive = false;
+let map, cityCoordinates = {}, validAreas = [], markers = [], cityPolygons = {}, activePolygons = [], audio = null, audioTimeout = null, alertActive = false, alertTimeout = null;
 let desktopPermissionGranted = false;
 let selectedCities = [];
 
@@ -275,24 +275,21 @@ Promise.all([
     cityPolygons[city] = polygon;
   });
 
-  // --- מאזין להתרעות עם סינון לפי ערים נבחרות ---
-  db.ref("messages").on("child_added", snapshot => {
-    const data = snapshot.val();
-    if (!data || !data.text || !data.timestamp) return;
-    const msgTime = new Date(data.timestamp);
-    if (new Date() - msgTime > 60000) return;
+  db.ref("messages").on("child_added", snapshot=>{
+    const data=snapshot.val();
+    if(!data||!data.text||!data.timestamp) return;
+    const msgTime=new Date(data.timestamp); if(new Date()-msgTime>60000) return;
 
     const message = data.text;
     let settlements = new Set();
 
-    // אוסף את כל הערים שמופיעות בהתרעה
-    message.split("\n").forEach(line => {
-      if (line.startsWith("•")) {
-        let parts = line.split(":");
-        if (parts.length > 1) {
-          parts[1].split(",").forEach(city => {
-            let cleanCity = city.replace(/\(.*?\)/g, "").trim();
-            if (citiesData.cities[cleanCity]) settlements.add(cleanCity);
+    message.split("\n").forEach(line=>{
+      if(line.startsWith("•")){
+        let parts=line.split(":");
+        if(parts.length>1){
+          parts[1].split(",").forEach(city=>{
+            let cleanCity=city.replace(/\(.*?\)/g,"").trim();
+            if(validAreas.includes(cleanCity)) settlements.add(cleanCity);
           });
         }
       }
@@ -300,7 +297,6 @@ Promise.all([
 
     const citiesInMessage = Array.from(settlements);
 
-    // --- לוגיקה לסינון לפי ערים נבחרות ---
     let showAlert = false;
     if (selectedCities.length === 0) {
       showAlert = true;
@@ -309,40 +305,57 @@ Promise.all([
     }
 
     if (showAlert && citiesInMessage.length > 0) {
+
+      // --- עצירת התרעה קודמת אם קיימת ---
+      if(alertActive){
+        if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); }
+        const alertBox = document.getElementById('alert-box');
+        alertBox.style.display='none';
+        alertActive=false;
+        markers.forEach(m=>m.setMap(null));
+        markers=[];
+        activePolygons.forEach(p=>p.setMap(null));
+        activePolygons=[];
+        clearTimeout(alertTimeout);
+      }
+
       showDesktopNotification(message, citiesInMessage, citiesData);
 
-      if (audio) { audio.pause(); audio = null; clearTimeout(audioTimeout); soundBtn.textContent = "בדוק"; }
-      if (soundSelect.value !== "none") {
-        audio = new Audio(sounds[soundSelect.value]);
-        audio.loop = true;
+      if(soundSelect.value!=="none"){
+        audio=new Audio(sounds[soundSelect.value]);
+        audio.loop=true;
         audio.play();
-        soundBtn.textContent = "עצור";
-        audioTimeout = setTimeout(() => { audio.pause(); audio = null; soundBtn.textContent = "בדוק"; }, 8000);
+        soundBtn.textContent="עצור";
+        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
       }
 
       alertActive = true;
       const alertBox = document.getElementById('alert-box');
-      alertBox.innerHTML = message.replace(/\n/g, "<br>");
-      alertBox.style.display = 'block';
-      setTimeout(() => { alertBox.style.display = 'none'; alertActive = false; }, 10000);
+      alertBox.innerHTML = message.replace(/\n/g,"<br>");
+      alertBox.style.display='block';
+
+      alertTimeout = setTimeout(()=>{
+        alertBox.style.display='none';
+        alertActive=false;
+      },10000);
 
       let currentPolygons = [];
-      citiesInMessage.forEach(city => {
-        if (cityPolygons[city]) { cityPolygons[city].setMap(map); currentPolygons.push(cityPolygons[city]); }
+      citiesInMessage.forEach(city=>{
+        if(cityPolygons[city]){ cityPolygons[city].setMap(map); currentPolygons.push(cityPolygons[city]); }
         const coords = cityCoordinates[city];
-        if (coords) addFlashingMarker(coords.lat, coords.lng, message);
+        if(coords) addFlashingMarker(coords.lat, coords.lng, message);
       });
 
       activePolygons.push(...currentPolygons);
       fitMapToMarkersAndPolygons();
 
-      setTimeout(() => {
-        markers.forEach(m => m.setMap(null));
-        markers = [];
-        currentPolygons.forEach(p => p.setMap(null));
-        activePolygons = activePolygons.filter(p => !currentPolygons.includes(p));
+      setTimeout(()=>{
+        markers.forEach(m=>m.setMap(null));
+        markers=[];
+        currentPolygons.forEach(p=>p.setMap(null));
+        activePolygons=activePolygons.filter(p=>!currentPolygons.includes(p));
         fitMapToMarkersAndPolygons();
-      }, 10000);
+      },10000);
     }
   });
 

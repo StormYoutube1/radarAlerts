@@ -65,9 +65,9 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 
 #selected-cities {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  max-height: 100px;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 120px;
   overflow-y: auto;
   padding-right: 3px;
 }
@@ -75,16 +75,24 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 .selected-city {
   background: #222;
   border-radius: 6px;
-  padding: 3px 6px;
-  display: flex;
-  align-items: center;
+  padding: 5px 8px;
   font-size: 14px;
+  line-height: 1.3em;
 }
 
-.selected-city span { cursor: pointer; color: #f55; margin-left: 5px; font-weight: bold; }
+.selected-city strong { display: block; }
+.selected-city small { color: #aaa; font-size: 12px; display: block; margin-top: 2px; }
+
+.selected-city span.remove {
+  cursor: pointer;
+  color: #f55;
+  margin-right: 6px;
+  font-weight: bold;
+  float: left;
+}
 
 #city-search {
-  width: 100%;
+  width: calc(100% - 12px);
   padding: 6px 10px;
   border-radius: 8px;
   border: none;
@@ -197,10 +205,6 @@ function showDesktopNotification(message, citiesInMessage, citiesData) {
   const dateTimeStr = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
 
   const body = `${areasList}\n\n${dateTimeStr}\n\nרדאר 📡 - צבע אדום`;
-  console.log("📡 Desktop Notification נבנה:");
-  console.log("כותרת:", title);
-  console.log("אזורים:", areasList);
-  console.log("תאריך/שעה:", dateTimeStr);
 
   const notification = new Notification(title, { body: body, icon: 'cropped_circle_image.png' });
   notification.onclick = () => window.focus();
@@ -330,25 +334,26 @@ Promise.all([
     list.slice(0,8).forEach(c=>{
       const div = document.createElement("div");
       div.className="suggestion-item";
-      div.innerHTML = `<div class="suggestion-city">${c.he}</div><div class="suggestion-area">${areasData[c.area]?.he || ''}</div>`;
+      div.innerHTML = `<div class="suggestion-city">${c.he}</div><div class="suggestion-area">אזור - ${areasData[c.area]?.he || ''}</div>`;
       div.addEventListener("click", ()=>{
         if(selectedCities.length>=5){ alert("ניתן לבחור עד 5 ערים בלבד"); return; }
-        selectedCities.push(c.he); renderSelectedCities();
+        selectedCities.push(c.he); renderSelectedCities(citiesData, areasData);
         searchInput.value=""; suggestionsBox.innerHTML="";
       });
       suggestionsBox.appendChild(div);
     });
   }
 
-  function renderSelectedCities(){
+  function renderSelectedCities(citiesData, areasData){
     selectedCitiesContainer.innerHTML="";
-    selectedCities.forEach(city=>{
-      const span = document.createElement("div");
-      span.className="selected-city"; span.textContent=city;
-      const removeBtn = document.createElement("span"); removeBtn.textContent="×";
-      removeBtn.onclick=()=>{ selectedCities = selectedCities.filter(c=>c!==city); renderSelectedCities(); }
-      span.appendChild(removeBtn);
-      selectedCitiesContainer.appendChild(span);
+    selectedCities.forEach(cityName=>{
+      const cityObj = Object.values(citiesData.cities).find(c => c.he === cityName);
+      const areaName = cityObj && areasData[cityObj.area] ? areasData[cityObj.area].he : "";
+      const div = document.createElement("div");
+      div.className="selected-city";
+      div.innerHTML = `<span class="remove">×</span><strong>${cityName}</strong><small>אזור - ${areaName}</small>`;
+      div.querySelector(".remove").onclick=()=>{ selectedCities = selectedCities.filter(c=>c!==cityName); renderSelectedCities(citiesData, areasData); }
+      selectedCitiesContainer.appendChild(div);
     });
   }
 

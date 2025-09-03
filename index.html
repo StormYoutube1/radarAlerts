@@ -332,9 +332,10 @@ Promise.all([
   function renderSuggestions(list){
     suggestionsBox.innerHTML="";
     list.slice(0,8).forEach(c=>{
+      const areaName = areasData[c.area]?.he || "";
       const div = document.createElement("div");
       div.className="suggestion-item";
-      div.innerHTML = `<div class="suggestion-city">${c.he}</div><div class="suggestion-area">אזור - ${areasData[c.area]?.he || ''}</div>`;
+      div.innerHTML = `<div class="suggestion-city">${c.he}</div><div class="suggestion-area">אזור - ${areaName}</div>`;
       div.addEventListener("click", ()=>{
         if(selectedCities.length>=5){ alert("ניתן לבחור עד 5 ערים בלבד"); return; }
         selectedCities.push(c.he); renderSelectedCities(citiesData, areasData);
@@ -360,7 +361,7 @@ Promise.all([
   searchInput.addEventListener("input", ()=>{
     const val = searchInput.value.trim();
     if(val===""){ suggestionsBox.innerHTML=""; return; }
-    const filtered = Object.values(citiesData.cities).filter(c=>c.he.startsWith(val));
+    const filtered = Object.values(citiesData.cities).filter(c=>c.he.includes(val));
     renderSuggestions(filtered);
   });
 

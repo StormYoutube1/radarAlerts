@@ -2,12 +2,13 @@
 <html lang="he">
 <head>
 <meta charset="UTF-8">
-<title>מפת התרעות ישראל</title>
+<title>רדאר 📡 - צבע אדום</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="cropped_circle_image.png">
 <style>
 html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction: rtl; }
 #map { height: 100%; width: 100%; }
+
 .info-box {
   position: absolute;
   bottom: 20px;
@@ -23,6 +24,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   overflow-y: auto;
   max-height: 200px;
 }
+
 .logo-overlay {
   position: absolute;
   top: 10px;
@@ -53,14 +55,13 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   display: block;
   margin-top: 5px;
 }
-#sound-box button {
-  margin-top: 10px;
-}
+#sound-box button { margin-top: 10px; }
 </style>
 </head>
 <body>
+
 <div id="map"></div>
-<div class="logo-overlay"><img src="path_to_original_image.jpg" alt="Logo"></div>
+<div class="logo-overlay"><img src="cropped_circle_image.png" alt="Logo"></div>
 <div id="alert-box" class="info-box"></div>
 
 <div id="sound-box">
@@ -105,6 +106,7 @@ let activePolygons = [];
 let audio = null;
 let audioTimeout = null;
 let alertActive = false;
+let desktopPermissionGranted = false;
 
 // --- סאונדים ---
 const sounds = {
@@ -143,7 +145,7 @@ function addFlashingMarker(lat, lng, message) {
   }, 10000);
 }
 
-// --- זום מתאים למרקרים + פוליגונים ---
+// --- זום למרקרים ופוליגונים ---
 function fitMapToMarkersAndPolygons() {
   const bounds = new google.maps.LatLngBounds();
   let hasAny = false;
@@ -154,10 +156,7 @@ function fitMapToMarkersAndPolygons() {
   });
 
   if(hasAny) map.fitBounds(bounds);
-  else {
-    map.setCenter({lat: 31.5, lng: 34.8});
-    map.setZoom(7);
-  }
+  else { map.setCenter({lat: 31.5, lng: 34.8}); map.setZoom(7); }
 }
 
 // --- סאונד כפתור ---
@@ -191,6 +190,59 @@ function updateDateTime() {
 }
 setInterval(updateDateTime,1000); updateDateTime();
 
+// --- בקשת הרשאה Desktop Notification ---
+if ("Notification" in window) {
+  const notificationBox = document.createElement("div");
+  notificationBox.style.position = "absolute";
+  notificationBox.style.bottom = "10px";
+  notificationBox.style.left = "10px";
+  notificationBox.style.background = "#111";
+  notificationBox.style.color = "white";
+  notificationBox.style.padding = "8px";
+  notificationBox.style.borderRadius = "8px";
+  notificationBox.style.zIndex = "1002";
+  notificationBox.innerHTML = `
+    <label style="cursor:pointer;">
+      <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות
+    </label>
+  `;
+  document.body.appendChild(notificationBox);
+
+  const checkbox = document.getElementById("notifyPermission");
+  checkbox.addEventListener("change", () => {
+    if (checkbox.checked) {
+      Notification.requestPermission().then(permission => { desktopPermissionGranted = permission==="granted"; });
+    } else desktopPermissionGranted = false;
+  });
+}
+
+// --- הצגת Desktop Notification ---
+function showDesktopNotification(message, citiesInMessage, citiesData) {
+  if(!desktopPermissionGranted) return;
+
+  const firstLine = message.split("\n").find(l => l.trim() !== "");
+  const title = firstLine || "🚨 התרעה";
+
+  const areasSet = new Set();
+  citiesInMessage.forEach(city=>{
+    const cityObj = Object.values(citiesData.cities).find(c => c.he === city);
+    if(cityObj && cityObj.area){
+      const areaId = cityObj.area;
+      const areaName = citiesData.areas[areaId]?.he;
+      if(areaName) areasSet.add(areaName);
+    }
+  });
+
+  const areasList = Array.from(areasSet).sort((a,b)=>a.localeCompare(b,'he')).join(", ");
+  const now = new Date();
+  const options = { timeZone: 'Asia/Jerusalem', hour12:false };
+  const dateTimeStr = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
+  const body = `${areasList}\n\n${dateTimeStr}\n\nרדאר 📡 - צבע אדום`;
+
+  const notification = new Notification(title,{body:body,icon:'cropped_circle_image.png'});
+  notification.onclick = () => window.focus();
+}
+
 // --- טעינת JSONs ---
 Promise.all([
   fetch('citiess.json').then(res => res.json()),
@@ -203,7 +255,7 @@ Promise.all([
   if(!map)initMap();
   let activeInfoWindow = null;
 
-  // --- יצירת פוליגונים ---
+  // --- פוליגונים ---
   Object.keys(polygonsData).forEach(city=>{
     const pathCoords = polygonsData[city].map(coord=>({lat:coord[0], lng:coord[1]}));
     const polygon = new google.maps.Polygon({
@@ -216,7 +268,6 @@ Promise.all([
       map:null
     });
     
-    // infoWindow על לחיצה
     const infoWindow = new google.maps.InfoWindow({content: city});
     polygon.addListener('click', e=>{
       if(activeInfoWindow) activeInfoWindow.close();
@@ -226,8 +277,6 @@ Promise.all([
     });
     cityPolygons[city] = polygon;
   });
-    
-  
 
   // --- התרעות Firebase ---
   db.ref("messages").on("child_added", snapshot=>{
@@ -241,7 +290,6 @@ Promise.all([
     const message = data.text;
     let settlements = new Set();
 
-    // --- חיפוש ערים לפי שורה ---
     message.split("\n").forEach(line=>{
       if(line.startsWith("•")){
         let parts=line.split(":");
@@ -254,11 +302,6 @@ Promise.all([
       }
     });
 
-    // --- חיפוש אזורים משולבים ---
-    const combined_areas_pattern = /(שדרות, איבים|אל עמארני, אל מסק|גבים, מכללת ספיר|זמרת, שובה|מבטחים, עמיעוז, ישע|מעגלים, גבעולים, מלילות|צוחר, אוהד|קריית גת, כרמי גת|חיפה - כרמל, הדר ועיר תחתית|חוף כינר, דוגה, דוגית|חוף כורסי, לבנון, חלוקים|חוף גולן, צאלון|אשדוד - א,ב,ד,ה|אשדוד - יא,יב,טו,יז,מרינה,סיטי|אשדוד - ח,ט,י,יג,יד,טז|אשדוד - ג,ו,ז)/g;
-    const matches=message.match(combined_areas_pattern);
-    if(matches) matches.forEach(m=>settlements.add(m));
-
     const citiesInMessage = Array.from(settlements);
     if(citiesInMessage.length>0){
 
@@ -268,28 +311,32 @@ Promise.all([
         audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
       }
 
-      // --- הצגת הודעה ---
-      alertActive = true;
+      // --- חלון שחור ---
       const alertBox = document.getElementById('alert-box');
-      alertBox.innerHTML = message.replace(/\n/g, "<br>");
+      const areasSet2 = new Set();
+      citiesInMessage.forEach(city=>{
+        const cityObj = Object.values(citiesData.cities).find(c=>c.he===city);
+        if(cityObj && cityObj.area){ const areaName=citiesData.areas[cityObj.area]?.he; if(areaName) areasSet2.add(areaName);}
+      });
+      const areasList2 = Array.from(areasSet2).sort((a,b)=>a.localeCompare(b,'he')).join(", ");
+      const firstLine = message.split("\n").find(l=>l.trim()!=="")||"🚨 התרעה";
+      const now2=new Date();
+      const options={timeZone:'Asia/Jerusalem', hour12:false};
+      const dateTimeStr2 = `${now2.toLocaleDateString('he-IL', options)} - ${now2.toLocaleTimeString('he-IL', options)}`;
+      alertBox.innerHTML=`<b>${firstLine}</b><br>${areasList2}<br><br>${dateTimeStr2}<br><br>רדאר 📡 - צבע אדום`;
       alertBox.style.display='block';
-      setTimeout(()=>{ alertBox.style.display='none'; alertActive=false; },10000);
+      setTimeout(()=>{ alertBox.style.display='none'; },10000);
 
-      // --- הצגת מרקרים ופוליגונים ---
+      // --- מרקרים ופוליגונים ---
       let currentPolygons = [];
       citiesInMessage.forEach(city=>{
-        if(cityPolygons[city]){
-          cityPolygons[city].setMap(map);
-          currentPolygons.push(cityPolygons[city]);
-        }
+        if(cityPolygons[city]){ cityPolygons[city].setMap(map); currentPolygons.push(cityPolygons[city]); }
         const coords = cityCoordinates[city];
         if(coords) addFlashingMarker(coords.lat, coords.lng, message);
       });
-
       activePolygons.push(...currentPolygons);
       fitMapToMarkersAndPolygons();
 
-      // --- הסרה אחרי 10 שניות ---
       setTimeout(()=>{
         markers.forEach(m=>m.setMap(null));
         markers=[];
@@ -298,8 +345,9 @@ Promise.all([
         fitMapToMarkersAndPolygons();
       },10000);
 
+      // --- Desktop Notification ---
+      showDesktopNotification(message, citiesInMessage, citiesData);
     }
-
   });
 
 }).catch(err=>console.error('Error loading JSON files:', err));
@@ -308,5 +356,3 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-
-

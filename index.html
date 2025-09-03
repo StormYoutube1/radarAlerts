@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>מפת התרעות ישראל</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/jpeg" href="path_to_original_image.jpg">
 <style>
 html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction: rtl; }
 #map { height: 100%; width: 100%; }
@@ -108,9 +109,9 @@ let alertActive = false;
 // --- סאונדים ---
 const sounds = {
   calm: "calm.mp3",
-  siren: "siren.mp3",
+  siren: "alert.mp3",
   homefront: "homefront.mp3",
-  alert: "alert.mp3",
+  alert: "siren.mp3",
   beep: "beep.wav"
 };
 
@@ -307,5 +308,4 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-
 

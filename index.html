@@ -188,14 +188,10 @@ const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3
 // --- הרשאת התראות ---
 const notifyCheckbox = document.getElementById("notifyPermission");
 function updateNotifyCheckbox() {
-  if (!("Notification" in window) || Notification.permission !== "granted") {
-    desktopPermissionGranted = false;
-    notifyCheckbox.checked = false;
-  } else {
-    desktopPermissionGranted = true;
-    notifyCheckbox.checked = true;
-  }
+  desktopPermissionGranted = Notification.permission === "granted";
+  notifyCheckbox.checked = false;
 }
+ 
 notifyCheckbox.addEventListener("change", function() {
   if (this.checked && "Notification" in window) {
     Notification.requestPermission().then(permission => {
@@ -445,4 +441,5 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+
 

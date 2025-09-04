@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="UTF-8">
+<title>רדאר 📡 - פלטפורמות</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: Arial, sans-serif;
+    background-color: #ff1a1a; /* אדום חזק יותר */
+    direction: rtl;
+    overflow: hidden; /* מונע גלילה */
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 80px; /* מרווח מלמעלה */
+    box-sizing: border-box;
+  }
+
+  /* לוגו בלחיצה חזרה לדף הראשי */
+  .logo-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    overflow: hidden;
+    z-index: 1000;
+    cursor: pointer;
+    border: 2px solid #fff;
+    transition: transform 0.3s;
+  }
+  .logo-overlay:hover {
+    transform: scale(1.1);
+  }
+  .logo-overlay img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  h1 {
+    text-align: center;
+    color: white;
+    font-size: 48px;
+    font-weight: bold;
+    margin: 0 0 40px 0;
+  }
+
+  .platforms-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    width: 90%;
+    max-width: 900px;
+    flex-grow: 1;
+    align-content: space-around; /* מרווח בין השורות */
+  }
+
+  .platform-card {
+    width: 45%;
+    background-color: white;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: transform 0.3s, box-shadow 0.3s, background-color 0.3s;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .platform-card:hover {
+    transform: translateY(-10px) scale(1.03);
+    box-shadow: 0 12px 25px rgba(0,0,0,0.45);
+    background-color: #ffe6e6;
+  }
+
+  .platform-card:active {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.4);
+  }
+
+  .platform-card img {
+    width: 60px;
+    height: 60px;
+    margin-top: 15px;
+    object-fit: contain;
+    transition: transform 0.3s;
+  }
+
+  .platform-card:hover img {
+    transform: scale(1.2);
+  }
+
+  .platform-card h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #333;
+    transition: color 0.3s;
+  }
+
+  .platform-card:hover h2 {
+    color: #ff4444;
+  }
+
+  @media (max-width: 700px) {
+    .platform-card {
+      width: 100%;
+    }
+  }
+</style>
+</head>
+<body>
+
+
+<div class="logo-overlay" onclick="window.location.href='index.html'">
+  <img src="cropped_circle_image.png" alt="Logo">
+</div>
+
+<h1>רדאר 📡 - פלטפורמות</h1>
+
+<div class="platforms-container">
+  
+  <div class="platform-card" onclick="window.open('https://t.me/Radar_Alerts', '_blank')">
+    <h2>ערוץ טלגרם</h2>
+    <img src="telegram_1.png" alt="Telegram Logo">
+  </div>
+
+  <div class="platform-card" onclick="window.open('https://whatsapp.com/channel/0029VbAsDKn2P59n8ws3Sd2E', '_blank')">
+    <h2>ערוץ וואטסאפ</h2>
+    <img src="whatsapp_1.png" alt="WhatsApp Logo">
+  </div>
+
+  <div class="platform-card" onclick="window.open('https://www.facebook.com/profile.php?id=61576133079123', '_blank')">
+    <h2>דף פייסבוק</h2>
+    <img src="facebook_1.png" alt="Facebook Logo">
+  </div>
+
+  <div class="platform-card" onclick="window.open('https://x.com/radar_alerts_?s=21', '_blank')">
+    <h2>טוויטר (X)</h2>
+    <img src="twitter_1.png" alt="Twitter Logo">
+  </div>
+</div>
+
+</body>
+</html>

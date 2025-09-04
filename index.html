@@ -189,7 +189,9 @@ const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3
 const notifyCheckbox = document.getElementById("notifyPermission");
 function updateNotifyCheckbox() {
   desktopPermissionGranted = Notification.permission === "granted";
+  
   notifyCheckbox.checked = false;
+  notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
 }
  
 notifyCheckbox.addEventListener("change", function() {
@@ -441,5 +443,6 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+
 
 

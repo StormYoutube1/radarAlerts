@@ -11,9 +11,9 @@
     padding: 0;
     height: 100%;
     font-family: Arial, sans-serif;
-    background-color: #ff1a1a; /* אדום חזק יותר */
+    background-color: #ff1a1a;
     direction: rtl;
-    overflow: hidden; /* אין גלילה במחשב */
+    overflow: hidden; /* אין גלילה */
   }
 
   body {
@@ -21,12 +21,11 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    padding-top: 80px; /* מרווח מלמעלה */
+    padding-top: 80px;
     box-sizing: border-box;
     height: 100vh;
   }
 
-  /* לוגו בלחיצה חזרה לדף הראשי */
   .logo-overlay {
     position: absolute;
     top: 10px;
@@ -40,14 +39,8 @@
     border: 2px solid #fff;
     transition: transform 0.3s;
   }
-  .logo-overlay:hover {
-    transform: scale(1.1);
-  }
-  .logo-overlay img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
+  .logo-overlay:hover { transform: scale(1.1); }
+  .logo-overlay img { width: 100%; height: 100%; object-fit: cover; }
 
   h1 {
     text-align: center;
@@ -65,15 +58,16 @@
     max-width: 900px;
     flex-grow: 1;
     align-content: space-around;
-    height: calc(100vh - 140px); /* משתמש בגובה המסך */
+    height: calc(100vh - 140px);
   }
 
   .platform-card {
     width: 45%;
+    height: 40%;
     background-color: white;
     border-radius: 12px;
-    margin-bottom: 20px;
     padding: 20px;
+    margin-bottom: 20px;
     text-align: center;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
@@ -90,11 +84,6 @@
     background-color: #ffe6e6;
   }
 
-  .platform-card:active {
-    transform: translateY(-5px) scale(1.02);
-    box-shadow: 0 8px 18px rgba(0,0,0,0.4);
-  }
-
   .platform-card img {
     width: 60px;
     height: 60px;
@@ -103,9 +92,7 @@
     transition: transform 0.3s;
   }
 
-  .platform-card:hover img {
-    transform: scale(1.2);
-  }
+  .platform-card:hover img { transform: scale(1.2); }
 
   .platform-card h2 {
     margin: 0;
@@ -114,23 +101,30 @@
     transition: color 0.3s;
   }
 
-  .platform-card:hover h2 {
-    color: #ff4444;
-  }
+  .platform-card:hover h2 { color: #ff4444; }
 
+  /* מובייל - כל הכרטיסים נכנסים במסך אחד, בלי גלילה */
   @media (max-width: 700px) {
-    body {
-      overflow-y: auto; /* מאפשר גלילה במובייל */
-      padding-top: 20px;
+    html, body { overflow: hidden; }
+    body { padding-top: 20px; }
+    h1 { font-size: 32px; margin-bottom: 20px; }
+    .platforms-container {
+      height: auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 10px;
+      width: 95%;
+      max-width: 100%;
     }
     .platform-card {
-      width: 90%;
-      margin-bottom: 15px;
+      width: 100%;
+      height: auto;
+      padding: 15px;
+      margin-bottom: 0;
     }
-    h1 {
-      font-size: 36px;
-      margin-bottom: 20px;
-    }
+    .platform-card img { width: 50px; height: 50px; margin-top: 10px; }
+    .platform-card h2 { font-size: 18px; }
   }
 </style>
 </head>
@@ -143,7 +137,6 @@
 <h1>רדאר 📡 - פלטפורמות</h1>
 
 <div class="platforms-container">
-  
   <div class="platform-card" onclick="window.open('https://t.me/Radar_Alerts', '_blank')">
     <h2>ערוץ טלגרם</h2>
     <img src="telegram_1.png" alt="Telegram Logo">

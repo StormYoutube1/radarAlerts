@@ -128,7 +128,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         transform: translateX(50%);
         top: auto;
         bottom: 20px;
-        max-height: 60vh;
+        max-height: 50vh;
     }
     .logo-overlay {
         top: 10px;
@@ -141,6 +141,10 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         bottom: 90px;
         right: 10px;
         max-width: 90%;
+    }
+    #city-suggestions,
+    #selected-cities {
+        display: none;
     }
     #sound-box label input#notifyPermission {
         display: none;
@@ -445,25 +449,17 @@ Promise.all([
       const div = document.createElement("div");
       div.className="suggestion-item";
       div.innerHTML = `<div class="suggestion-city">${c.he}</div>${areaName ? `<div class="suggestion-area">אזור ${areaName}</div>` : ""}`;
-      ["click", "touchstart"].forEach(evt => {
-        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-        const eventType = isMobile ? "touchstart" : "click";
-        div.addEventListener(eventType, (e) => {
-            if(eventType === "touchstart") e.preventDefault();
-            if(selectedCities.length >= 5){
-                alert("ניתן לבחור עד 5 ערים בלבד");
-                return;
-            }
-            selectedCities.push(c.he);
-            renderSelectedCities(citiesData, citiesData.areas);
-            searchInput.value = "";
-            suggestionsBox.innerHTML = "";
-        });    
+      div.addEventListener("click", ()=>{
+        if(selectedCities.length>=5){ alert("ניתן לבחור עד 5 ערים בלבד"); return; }
+        selectedCities.push(c.he);
+        renderSelectedCities(citiesData, citiesData.areas);
+        searchInput.value="";
+        suggestionsBox.innerHTML="";
       });
       suggestionsBox.appendChild(div);
     });
-}
-      
+  }
+   
 
   function renderSelectedCities(citiesData, areasData){
     selectedCitiesContainer.innerHTML="";

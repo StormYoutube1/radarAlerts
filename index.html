@@ -121,6 +121,50 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 
 .suggestion-city { font-weight: bold; }
 .suggestion-area { font-size: 12px; color: #aaa; }
+@media (max-width: 600px) {
+    #sound-box {
+        width: 90%;
+        right: 50%;
+        transform: translateX(50%);
+        top: auto;
+        bottom: 20px;
+        max-height: 60vh;
+    }
+    .logo-overlay {
+        top: 10px;
+        right: 10px;
+        left: auto;
+        width: 50px;
+        height: 50px;
+    }
+    #alert-box {
+        bottom: 90px;
+        right: 10px;
+        max-width: 90%;
+    }
+}
+@media (max-width: 900px) and (min-width: 601px) {
+    #sound-box {
+        width: 300px;
+        right: 10px;
+        top: auto;
+        bottom: 20px;
+        max-height: 70vh;
+    }
+    .logo-overlay {
+        top: 10px;
+        right: 10px;
+        left: auto;
+    }
+}
+@media (min-width: 901px) {
+    #sound-box {
+        right: 20px;
+        top: 20px;
+        width: 300px;
+        max-height: 500px;
+    }
+}
 </style>
 </head>
 <body>
@@ -443,6 +487,7 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+
 
 
 

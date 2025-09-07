@@ -122,26 +122,56 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 .suggestion-city { font-weight: bold; }
 .suggestion-area { font-size: 12px; color: #aaa; }
 
-.mobile-only { display: none !important; }
-.desktop-only { display: block !important; }
-
 @media (max-width: 600px) {
-    #sound-box { width:90%; right:50%; transform:translateX(50%); bottom:20px; max-height:50vh; }
-    .logo-overlay { top:10px; right:10px; left:auto; width:50px; height:50px; }
-    #alert-box { bottom:90px; right:10px; max-width:90%; }
-    #city-suggestions, #city-search, #selected-cities { display:none; }
-
-    .mobile-only { display: block; }
-    .desktop-only { display: none; }
+    #sound-box {
+        width: 90%;
+        right: 50%;
+        transform: translateX(50%);
+        top: auto;
+        bottom: 20px;
+        max-height: 50vh;
+    }
+    .logo-overlay {
+        top: 10px;
+        right: 10px;
+        left: auto;
+        width: 50px;
+        height: 50px;
+    }
+    #alert-box {
+        bottom: 90px;
+        right: 10px;
+        max-width: 90%;
+    }
+    #city-suggestions,
+    #city-search,
+    #selected-cities {
+        display: none;
+    }
 }
 
 @media (max-width: 900px) and (min-width: 601px) {
-    #sound-box { width: 300px; right: 10px; top: auto; bottom: 20px; max-height: 70vh; }
-    .logo-overlay { top: 10px; right: 10px; left: auto; }
+    #sound-box {
+        width: 300px;
+        right: 10px;
+        top: auto;
+        bottom: 20px;
+        max-height: 70vh;
+    }
+    .logo-overlay {
+        top: 10px;
+        right: 10px;
+        left: auto;
+    }
 }
 
 @media (min-width: 901px) {
-    #sound-box { right: 20px; top: 20px; width: 300px; max-height: 500px; }
+    #sound-box {
+        right: 20px;
+        top: 20px;
+        width: 300px;
+        max-height: 500px;
+    }
 }
 </style>
 </head>
@@ -152,31 +182,34 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 
 <div id="sound-box">
   <div id="datetime" style="color:white;font-weight:bold;"></div>
-  
-  <label for="sound-select" class="desktop-only">בחר צליל התרעה:</label>
-  <select id="sound-select" class="desktop-only">
-    <option value="none" selected>ללא</option>
-    <option value="alert">התרעה</option>
-    <option value="calm">רגוע</option>
-    <option value="siren">אזעקה</option>
-    <option value="homefront">פיקוד העורף</option>
-    <option value="beep">צפצוף</option>
-  </select>
 
-  <label for="sound-mobile" class="mobile-only" style="cursor:pointer; margin-top:5px;">
-    <input type="checkbox" id="sound-mobile"> הפעל סאונד
+  <!-- תיבת סימון -->
+  <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+    <input type="checkbox" id="enable-sound">
+    הפעל צליל התרעה
   </label>
 
-  <button id="sound-btn" class="mobile-only">בדוק</button>
+  <!-- רשימה נפתחת + כפתור בדיקה -->
+  <div style="display:flex; align-items:center; gap:5px; margin-top:5px;">
+    <select id="sound-select">
+      <option value="alert">התרעה</option>
+      <option value="calm">רגוע</option>
+      <option value="siren">אזעקה</option>
+      <option value="homefront">פיקוד העורף</option>
+      <option value="beep">צפצוף</option>
+    </select>
+    <button id="sound-btn">בדוק</button>
+  </div>
 
-  <label style="margin-top:10px;cursor:pointer;">
+  <!-- הרשאות דפדפן -->
+  <label style="margin-top:10px; cursor:pointer;">
     <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
   </label>
 
   <input type="text" id="city-search" placeholder="הקלד יישוב כדי לקבל התרעות רק עבורו...">
   <div id="city-suggestions"></div>
   <div id="selected-cities"></div>
-  
+
   <div style="margin-top:auto; text-align:center; padding-top:10px;">
       <div style="border-top:1px solid #555; padding-top:5px; color:#ff4444; font-weight:bold;">
           רדאר 📡 - צבע אדום
@@ -186,7 +219,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
                   style="padding:6px 12px; border:none; border-radius:6px; background:#444; color:white; cursor:pointer;">
             לפלטפורמות שלנו
           </button>
-    </div>
+      </div>
   </div>
 </div>
 
@@ -209,100 +242,31 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let map, cityCoordinates = {}, validAreas = [], markers = [], cityPolygons = {}, activePolygons = [], audio = null, audioTimeout = null, alertActive = false, alertTimeout = null;
-let desktopPermissionGranted = false;
-let selectedCities = [];
-
-const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3", alert: "siren.mp3", beep: "beep.wav" };
-
-// --- הרשאת התראות ---
-const notifyCheckbox = document.getElementById("notifyPermission");
-function updateNotifyCheckbox() {
-  desktopPermissionGranted = Notification.permission === "granted";
-  
-  notifyCheckbox.checked = false;
-  notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
-}
- 
-notifyCheckbox.addEventListener("change", function() {
-  if (this.checked && "Notification" in window) {
-    Notification.requestPermission().then(permission => {
-      desktopPermissionGranted = permission === "granted";
-      if (!desktopPermissionGranted) this.checked = false;
-    });
-  } else {
-    desktopPermissionGranted = false;
-  }
-});
-updateNotifyCheckbox();
-
-// --- הצגת התראה בדסקטופ ---
-function showDesktopNotification(message, citiesInMessage, citiesData) {
-  if (!desktopPermissionGranted) return;
-
-  const firstLine = message.split("\n").find(l => l.trim() !== "");
-  const title = firstLine || "🚨 התרעה";
-
-  const areasSet = new Set();
-  citiesInMessage.forEach(city => {
-    const cityObj = Object.values(citiesData.cities).find(c => c.he === city);
-    if (cityObj && cityObj.area) {
-      const areaId = cityObj.area;
-      const areaName = citiesData.areas[areaId]?.he;
-      if (areaName) areasSet.add(areaName);
-    }
-  });
-  const areasList = Array.from(areasSet).sort((a,b)=> a.localeCompare(b, 'he')).join(", ");
-
-  const now = new Date();
-  const options = { timeZone: 'Asia/Jerusalem', hour12:false };
-  const dateTimeStr = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
-
-  const body = `${areasList}\n\n${dateTimeStr}\n\nרדאר 📡 - צבע אדום`;
-
-  const notification = new Notification(title, { body: body, icon: 'cropped_circle_image.png' });
-  notification.onclick = () => window.focus();
-}
-
-// --- מפה ---
-function initMap() {
-  map = new google.maps.Map(document.getElementById('map'), {
-    center: {lat: 31.5, lng: 34.8},
-    zoom: 7,
-    mapTypeId: 'roadmap',
-    disableDefaultUI: true
-  });
-}
-
-// --- פלאש מרקרים ---
-function addFlashingMarker(lat, lng, message) {
-  const marker = new google.maps.Marker({position: {lat, lng}, map, title: message});
-  markers.push(marker);
-  let visible = true;
-  const flashInterval = setInterval(() => { marker.setVisible(visible); visible = !visible; }, 600);
-  setTimeout(() => { marker.setMap(null); clearInterval(flashInterval); markers = markers.filter(m => m!==marker); }, 10000);
-}
+let map, audio=null, audioTimeout=null;
 
 // --- סאונד ---
+const enableSoundCheckbox = document.getElementById("enable-sound");
 const soundSelect = document.getElementById("sound-select");
 const soundBtn = document.getElementById("sound-btn");
-function updateSoundButton() { soundBtn.style.display = soundSelect.value==="none"?"none":"block"; soundBtn.textContent="בדוק"; }
-soundSelect.addEventListener("change", updateSoundButton);
-function toggleSound() {
-  const selected = soundSelect.value;
-  if(selected==="none") return;
-  if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק"; } 
-  else{ audio=new Audio(sounds[selected]); audio.loop=true; audio.play(); soundBtn.textContent="עצור";
-    audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
-  }
+const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3", alert: "siren.mp3", beep: "beep.wav" };
+
+function toggleSound(){
+  if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק"; return; }
+  if(!enableSoundCheckbox.checked) return;
+  const val = soundSelect.value;
+  audio = new Audio(sounds[val]);
+  audio.loop=true;
+  audio.play();
+  soundBtn.textContent="עצור";
+  audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
 }
 soundBtn.addEventListener("click", toggleSound);
 
 // --- תאריך ושעה ---
-function updateDateTime() {
-  const now = new Date();
-  const options = {timeZone:'Asia/Jerusalem', hour12:false};
-  document.getElementById("datetime").textContent = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
+function updateDateTime(){
+  const now=new Date();
+  const options={timeZone:'Asia/Jerusalem', hour12:false};
+  document.getElementById("datetime").textContent = `${now.toLocaleDateString('he-IL',options)} - ${now.toLocaleTimeString('he-IL',options)}`;
 }
 setInterval(updateDateTime,1000); updateDateTime();
 

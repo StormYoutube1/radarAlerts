@@ -583,8 +583,9 @@ db.ref("api_alerts").on("child_added", snapshot => {
     const data = snapshot.val();
     if(!data || !data.data) return;
 
-    const alertData = snapshot.val();  // כאן זה המערך של שמות ערים
-    if(!alertData || !alertData.data || alertData.data.length === 0) return;
+    const wrapper = snapshot.val();
+    const alertData = wrapper.data;
+    if(!alertData.data || alertData.data.length === 0) return;
 
     // --- המרת שמות ערים לנקודות ---
     const points = [];
@@ -607,7 +608,7 @@ db.ref("api_alerts").on("child_added", snapshot => {
     }
 
     // --- הצגת התרעה בדסקטופ + סאונד ---
-    showDesktopNotification(alertData.desc, points.map(p=>p.name), citiesData);
+    showDesktopNotification(alertData.desc, points.map(p=>p.name));
     if(soundSelect.value !== "none" && enableSoundCheckbox.checked){
         audio=new Audio(sounds[soundSelect.value]);
         audio.loop=true;
@@ -693,6 +694,4 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-
-
 

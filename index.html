@@ -583,8 +583,8 @@ db.ref("api_alerts").on("child_added", snapshot => {
     const data = snapshot.val();
     if(!data || !data.data) return;
 
-    const alertData = data.data;  // כאן זה המערך של שמות ערים
-    if(!alertData.data || alertData.data.length === 0) return;
+    const alertData = snapshot.val();  // כאן זה המערך של שמות ערים
+    if(!alertData || !alertData.data || alertData.data.length === 0) return;
 
     // --- המרת שמות ערים לנקודות ---
     const points = [];
@@ -693,5 +693,6 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+
 
 

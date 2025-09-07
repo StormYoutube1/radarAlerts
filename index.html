@@ -316,6 +316,7 @@ const soundSelect = document.getElementById("sound-select");
 const soundBtn = document.getElementById("sound-btn");
 function updateSoundButton() { soundBtn.style.display = soundSelect.value==="none"?"none":"block"; soundBtn.textContent="בדוק"; }
 soundSelect.addEventListener("change", updateSoundButton);
+updateSoundButton();
 function toggleSound() {
   const selected = soundSelect.value;
   if(selected==="none") return;

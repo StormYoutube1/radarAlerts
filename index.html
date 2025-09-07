@@ -131,6 +131,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         bottom: 20px;
         max-height: 50vh;
     }
+    
     .logo-overlay {
         top: 10px;
         right: 10px;
@@ -149,9 +150,15 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         display: none;
     }
 
-    /* 🔹 שינוי לנייד בלבד: תיבת הסימון של סאונד */
-    #sound-box label input#soundMobileCheckbox {
-        display: block;
+    /* מובייל – תיבת סימון "הפעל סאונד" */
+    .mobile-only { display: block; }
+    .desktop-only { display: none; }
+
+    #sound-box label input#notifyPermission {
+        display: none;
+    }
+    #sound-box label:has(input#notifyPermission) {
+        display: none;
     }
 }
 
@@ -187,8 +194,10 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 
 <div id="sound-box">
   <div id="datetime" style="color:white;font-weight:bold;"></div>
-  <label for="sound-select">בחר צליל התרעה:</label>
-  <select id="sound-select">
+  
+  <!-- דסקטופ: רשימת סאונדים -->
+  <label for="sound-select" class="desktop-only">בחר צליל התרעה:</label>
+  <select id="sound-select" class="desktop-only">
     <option value="none" selected>ללא</option>
     <option value="alert">התרעה</option>
     <option value="calm">רגוע</option>
@@ -196,21 +205,24 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     <option value="homefront">פיקוד העורף</option>
     <option value="beep">צפצוף</option>
   </select>
-  <button id="sound-btn" style="display:none;">בדוק</button>
 
-  <!-- 🔹 תיבת הסימון הקיימת נשארת בדיוק כמו שהיא -->
-  <label style="margin-top:10px;cursor:pointer;">
-    <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
+  <!-- מובייל: תיבת סימון להפעלת סאונד -->
+  <label for="sound-mobile" class="mobile-only" style="cursor:pointer; display:none; margin-top:5px;">
+    <input type="checkbox" id="sound-mobile"> הפעל סאונד
   </label>
 
-  <!-- 🔹 ניתן להוסיף כאן תיבת סימון סאונד לנייד אם תרצה -->
-  <label style="margin-top:10px;cursor:pointer; display:none;">
-    <input type="checkbox" id="soundMobileCheckbox"> הפעל צליל התרעה במובייל
+  <!-- כפתור בדיקה -->
+  <button id="sound-btn" style="display:none;">בדוק</button>
+
+  <!-- אפשר קבלת התרעות בדפדפן -->
+  <label style="margin-top:10px;cursor:pointer;">
+    <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
   </label>
 
   <input type="text" id="city-search" placeholder="הקלד יישוב כדי לקבל התרעות רק עבורו...">
   <div id="city-suggestions"></div>
   <div id="selected-cities"></div>
+  
   <div style="margin-top:auto; text-align:center; padding-top:10px;">
       <div style="border-top:1px solid #555; padding-top:5px; color:#ff4444; font-weight:bold;">
           רדאר 📡 - צבע אדום
@@ -221,6 +233,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
             לפלטפורמות שלנו
           </button>
     </div>
+  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -256,6 +269,7 @@ function updateNotifyCheckbox() {
   notifyCheckbox.checked = false;
   notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
 }
+ 
 notifyCheckbox.addEventListener("change", function() {
   if (this.checked && "Notification" in window) {
     Notification.requestPermission().then(permission => {
@@ -271,6 +285,7 @@ updateNotifyCheckbox();
 // --- הצגת התראה בדסקטופ ---
 function showDesktopNotification(message, citiesInMessage, citiesData) {
   if (!desktopPermissionGranted) return;
+
   const firstLine = message.split("\n").find(l => l.trim() !== "");
   const title = firstLine || "🚨 התרעה";
 
@@ -337,14 +352,161 @@ function updateDateTime() {
 }
 setInterval(updateDateTime,1000); updateDateTime();
 
-// --- טעינת JSONs + שאר הקוד נשאר כפי שהוא ---
+// --- טעינת JSONs ---
 Promise.all([
   fetch('citiess.json').then(res => res.json()),
   fetch('areas.json').then(res => res.json()),
   fetch('cleaned_fine.json').then(res => res.json())
 ]).then(([citiesData, areasData, polygonsData]) => {
-  //... (שאר הקוד נשאר ללא שינוי)
-});
+
+  Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
+  validAreas = areasData;
+  if(!map)initMap();
+  let activeInfoWindow = null;
+
+  Object.keys(polygonsData).forEach(city=>{
+    const pathCoords = polygonsData[city].map(coord=>({lat:coord[0], lng:coord[1]}));
+    const polygon = new google.maps.Polygon({ paths: pathCoords, strokeColor:'#000', strokeOpacity:1.0, strokeWeight:2, fillColor:'red', fillOpacity:0.4, map:null });
+    const infoWindow = new google.maps.InfoWindow({content: city});
+    polygon.addListener('click', e=>{
+      if(activeInfoWindow) activeInfoWindow.close();
+      infoWindow.setPosition(e.latLng); infoWindow.open(map); activeInfoWindow = infoWindow;
+    });
+    cityPolygons[city] = polygon;
+  });
+
+  db.ref("messages").on("child_added", snapshot=>{
+    const data=snapshot.val();
+    if(!data||!data.text||!data.timestamp) return;
+    const msgTime=new Date(data.timestamp); if(new Date()-msgTime>60000) return;
+
+    const message = data.text;
+    let settlements = new Set();
+
+    message.split("\n").forEach(line=>{
+      if(line.startsWith("•")){
+        let parts=line.split(":");
+        if(parts.length>1){
+          parts[1].split(",").forEach(city=>{
+            let cleanCity=city.replace(/\(.*?\)/g,"").trim();
+            if(validAreas.includes(cleanCity)) settlements.add(cleanCity);
+          });
+        }
+      }
+    });
+
+    const citiesInMessage = Array.from(settlements);
+
+    let showAlert = false;
+    if (selectedCities.length === 0) {
+      showAlert = true;
+    } else {
+      showAlert = citiesInMessage.some(city => selectedCities.includes(city));
+    }
+
+    if (showAlert && citiesInMessage.length > 0) {
+
+      // --- עצירת התרעה קודמת אם קיימת ---
+      if(alertActive){
+        if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); }
+        const alertBox = document.getElementById('alert-box');
+        alertBox.style.display='none';
+        alertActive=false;
+        markers.forEach(m=>m.setMap(null));
+        markers=[];
+        activePolygons.forEach(p=>p.setMap(null));
+        activePolygons=[];
+        clearTimeout(alertTimeout);
+      }
+
+      showDesktopNotification(message, citiesInMessage, citiesData);
+
+      if(soundSelect.value!=="none"){
+        audio=new Audio(sounds[soundSelect.value]);
+        audio.loop=true;
+        audio.play();
+        soundBtn.textContent="עצור";
+        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
+      }
+
+      alertActive = true;
+      const alertBox = document.getElementById('alert-box');
+      alertBox.innerHTML = message.replace(/\n/g,"<br>");
+      alertBox.style.display='block';
+
+      alertTimeout = setTimeout(()=>{
+        alertBox.style.display='none';
+        alertActive=false;
+      },10000);
+
+      let currentPolygons = [];
+      citiesInMessage.forEach(city=>{
+        if(cityPolygons[city]){ cityPolygons[city].setMap(map); currentPolygons.push(cityPolygons[city]); }
+        const coords = cityCoordinates[city];
+        if(coords) addFlashingMarker(coords.lat, coords.lng, message);
+      });
+
+      activePolygons.push(...currentPolygons);
+      fitMapToMarkersAndPolygons();
+
+      setTimeout(()=>{
+        markers.forEach(m=>m.setMap(null));
+        markers=[];
+        currentPolygons.forEach(p=>p.setMap(null));
+        activePolygons=activePolygons.filter(p=>!currentPolygons.includes(p));
+        fitMapToMarkersAndPolygons();
+      },10000);
+    }
+  });
+
+  // --- חיפוש ערים + הצעות ---
+  const searchInput = document.getElementById("city-search");
+  const suggestionsBox = document.getElementById("city-suggestions");
+  const selectedCitiesContainer = document.getElementById("selected-cities");
+
+  function renderSuggestions(list){
+    suggestionsBox.innerHTML = "";
+    list.slice(0,8).forEach(c=>{
+      const areaName = c.area && citiesData.areas[c.area] ? citiesData.areas[c.area].he : "";
+      const div = document.createElement("div");
+      div.className="suggestion-item";
+      div.innerHTML = `<div class="suggestion-city">${c.he}</div>${areaName ? `<div class="suggestion-area">אזור ${areaName}</div>` : ""}`;
+      div.addEventListener("click", ()=>{
+        if(selectedCities.length>=5){ alert("ניתן לבחור עד 5 ערים בלבד"); return; }
+        selectedCities.push(c.he);
+        renderSelectedCities(citiesData, citiesData.areas);
+        searchInput.value="";
+        suggestionsBox.innerHTML="";
+      });
+      suggestionsBox.appendChild(div);
+    });
+  }
+   
+
+  function renderSelectedCities(citiesData, areasData){
+    selectedCitiesContainer.innerHTML="";
+    selectedCities.forEach(cityName=>{
+      const cityObj = Object.values(citiesData.cities).find(c => c.he === cityName);
+      const areaName = cityObj && areasData[cityObj.area] ? areasData[cityObj.area].he : "";
+      const div = document.createElement("div");
+      div.className="selected-city";
+      div.innerHTML = `<span class="remove">×</span><strong>${cityName}</strong>${areaName ? `<small>אזור ${areaName}</small>` : ""}`;
+      div.querySelector(".remove").onclick = ()=>{
+        selectedCities = selectedCities.filter(c=>c!==cityName);
+        renderSelectedCities(citiesData, areasData);
+      }
+      selectedCitiesContainer.appendChild(div);
+    });
+  }
+
+  searchInput.addEventListener("input", ()=>{
+    const val = searchInput.value.trim();
+    if(val===""){ suggestionsBox.innerHTML=""; return; }
+    const filtered = Object.values(citiesData.cities).filter(c=>c.he.startsWith(val));
+    renderSuggestions(filtered);
+  });
+
+}).catch(err=>console.error('Error loading JSON files:', err));
 
 function fitMapToMarkersAndPolygons(){
   const bounds = new google.maps.LatLngBounds();
@@ -356,6 +518,5 @@ function fitMapToMarkersAndPolygons(){
 
 window.initMap = initMap;
 </script>
-
 </body>
 </html>

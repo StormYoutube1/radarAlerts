@@ -224,14 +224,8 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if(isMobile){
         document.body.innerHTML = `
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; font-family:Arial,sans-serif; padding:20px; gap:12px;">
-                <h2 style="font-size:22px; line-height:1.3;">⚠️ האתר אינו זמין במכשירים ניידים</h2>
-                <p style="font-size:16px; line-height:1.4; max-width:300px;">לצערנו, חלק מהפונקציות לא תומכות במובייל.</p>
-                <p style="font-size:16px; line-height:1.4; max-width:300px;">אנא פתח את האתר במחשב כדי לראות אותו במלואו.</p>
-                <button onclick="window.location.href='platform.html'" 
-                        style="margin-top:10px; padding:12px 24px; font-size:16px; border:none; border-radius:8px; background:#333; color:white; cursor:pointer; max-width:250px; width:100%;">
-                        לפלטפורמות שלנו
-                </button>
+            <div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;font-family:Arial,sans-serif;">
+                <h2>⚠️ האתר אינו זמין במכשירים ניידים</h2>
             </div>
         `;
     }
@@ -580,9 +574,69 @@ function fitMapToMarkersAndPolygons(){
 }
 
 window.initMap = initMap;
+db.ref("api_alerts").on("child_added", snapshot => {
+  const apiData = snapshot.val();
+  if (!apiData || !apiData.data) return;
+
+  // ניקוי פוליגונים קודמים
+  activePolygons.forEach(p => p.setMap(null));
+  activePolygons = [];
+
+  // בניית קבוצות פוליגונים (אם יש מרחקים גדולים)
+  const polygonsGroups = clusterPoints(apiData.data, 0.5); 
+  // 0.5 = סף מרחק בק"מ בין נקודות כדי להחליט אם שייכות לאותה קבוצה
+
+  polygonsGroups.forEach(group => {
+    if (group.length >= 3) {
+      const path = group.map(([lat, lng]) => ({ lat, lng }));
+      if (path[0].lat !== path[path.length-1].lat || path[0].lng !== path[path.length-1].lng) {
+        path.push(path[0]); // לסגור את הפוליגון
+      }
+      const polygon = new google.maps.Polygon({
+        paths: path,
+        strokeColor: "#000",
+        strokeOpacity: 1.0,
+        strokeWeight: 2,
+        fillColor: "red",
+        fillOpacity: 0.4,
+        map: map
+      });
+      activePolygons.push(polygon);
+    }
+  });
+
+  // התאמה לתצוגה
+  fitMapToMarkersAndPolygons();
+});
+
+// --- פונקציה פשוטה לקבץ נקודות לפי מרחק ---
+function clusterPoints(points, maxDistKm) {
+  const groups = [];
+  points.forEach(pt => {
+    let added = false;
+    for (const g of groups) {
+      if (g.some(p => distanceKm(p, pt) < maxDistKm)) {
+        g.push(pt);
+        added = true;
+        break;
+      }
+    }
+    if (!added) groups.push([pt]);
+  });
+  return groups;
+}
+
+// --- חישוב מרחק בק"מ בין שתי נקודות ---
+function distanceKm([lat1, lon1], [lat2, lon2]) {
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+            Math.sin(dLon/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
 </script>
 </body>
 </html>
-
-
-

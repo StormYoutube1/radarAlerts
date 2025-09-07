@@ -224,12 +224,12 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if(isMobile){
         document.body.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;font-family:Arial,sans-serif;">
-                <h2>⚠️ האתר אינו זמין במכשירים ניידים</h2>
-                <p>לצערנו, חלק מהפונקציות לא תומכות במובייל.</p>
-                <p>אנא פתח את האתר במחשב כדי לראות אותו במלואו.</p>
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; font-family:Arial,sans-serif; padding:20px; gap:12px;">
+                <h2 style="font-size:22px; line-height:1.3;">⚠️ האתר אינו זמין במכשירים ניידים</h2>
+                <p style="font-size:16px; line-height:1.4; max-width:300px;">לצערנו, חלק מהפונקציות לא תומכות במובייל.</p>
+                <p style="font-size:16px; line-height:1.4; max-width:300px;">אנא פתח את האתר במחשב שולחני כדי לראות את המפה וההתראות.</p>
                 <button onclick="window.location.href='platform.html'" 
-                        style="margin-top:20px; padding:10px 20px; font-size:16px; border:none; border-radius:8px; background:#333; color:white; cursor:pointer;">
+                        style="margin-top:10px; padding:12px 24px; font-size:16px; border:none; border-radius:8px; background:#333; color:white; cursor:pointer; max-width:250px; width:100%;">
                         לפלטפורמות שלנו
                 </button>
             </div>
@@ -583,4 +583,5 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+
 

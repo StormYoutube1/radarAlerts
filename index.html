@@ -579,86 +579,115 @@ function fitMapToMarkersAndPolygons(){
   if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
 }
 
-
-// --- פונקציות עזר ---
-function distanceKm([lat1, lon1], [lat2, lon2]) {
-  const R = 6371; // רדיוס כדור הארץ בק"מ
-  const dLat = (lat2-lat1) * Math.PI/180;
-  const dLon = (lon2-lon1) * Math.PI/180;
-  const a = Math.sin(dLat/2)**2 +
-            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
-            Math.sin(dLon/2)**2;
-  return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-function clusterPoints(points, maxDistKm) {
-  const groups = [];
-  points.forEach(pt => {
-    let added = false;
-    for (const g of groups) {
-      if (g.some(p => distanceKm(p, pt) < maxDistKm)) {
-        g.push(pt);
-        added = true;
-        break;
-      }
-    }
-    if (!added) groups.push([pt]);
-  });
-  return groups;
-}
-
-function fitMapToMarkersAndPolygons(){
-  const bounds = new google.maps.LatLngBounds();
-  let hasAny = false;
-  markers.forEach(m=>{ bounds.extend(m.getPosition()); hasAny=true; });
-  activePolygons.forEach(p=>p.getPath().forEach(coord=>{ bounds.extend(coord); hasAny=true; }));
-  if(hasAny) map.fitBounds(bounds);
-  else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
-}
-
-// --- מאזין ל-API_ALERTS (רק אחרי ש-cityCoordinates מוכנים) ---
 db.ref("api_alerts").on("child_added", snapshot => {
-  const apiData = snapshot.val();
-  if (!apiData || !apiData.data) return;
+    const data = snapshot.val();
+    if(!data || !data.data) return;
 
-  // המרת שמות ערים לנקודות לפי cityCoordinates
-  const points = apiData.data
-      .map(cityName => cityCoordinates[cityName] ? [cityCoordinates[cityName].lat, cityCoordinates[cityName].lng] : null)
-      .filter(Boolean);
+    const alertData = data.data;  // כאן זה המערך של שמות ערים
+    if(!alertData.data || alertData.data.length === 0) return;
 
-  if(points.length === 0) return;
+    // --- המרת שמות ערים לנקודות ---
+    const points = [];
+    alertData.data.forEach(name=>{
+        if(cityCoordinates[name]) points.push({name, lat: cityCoordinates[name].lat, lng: cityCoordinates[name].lng});
+    });
+    if(points.length === 0) return;
 
-  // ניקוי פוליגונים קודמים
-  activePolygons.forEach(p => p.setMap(null));
-  activePolygons = [];
+    // --- בדיקה אם העיר נבחרה בסינון ---
+    const showAlert = selectedCities.length === 0 || points.some(p=>selectedCities.includes(p.name));
+    if(!showAlert) return;
 
-  // בניית קבוצות פוליגונים לפי מרחק (0.5 ק"מ)
-  const polygonsGroups = clusterPoints(points, 0.5);
-
-  polygonsGroups.forEach(group => {
-    if (group.length >= 3) { // רק קבוצות עם לפחות 3 נקודות
-      const path = group.map(([lat, lng]) => ({ lat, lng }));
-      // לסגור את הפוליגון אם לא סגור
-      if (path[0].lat !== path[path.length-1].lat || path[0].lng !== path[path.length-1].lng) {
-        path.push(path[0]);
-      }
-      const polygon = new google.maps.Polygon({
-        paths: path,
-        strokeColor: "#000",
-        strokeOpacity: 1.0,
-        strokeWeight: 2,
-        fillColor: "red",
-        fillOpacity: 0.4,
-        map: map
-      });
-      activePolygons.push(polygon);
+    // --- עצירת התרעה קודמת ---
+    if(alertActive){
+        if(audio){ audio.pause(); audio=null; }
+        if(audioTimeout){ clearTimeout(audioTimeout); audioTimeout=null; }
+        activePolygons.forEach(p=>p.setMap(null));
+        activePolygons=[];
+        clearTimeout(alertTimeout);
     }
-  });
 
-  // התאמה לתצוגה
-  fitMapToMarkersAndPolygons();
+    // --- הצגת התרעה בדסקטופ + סאונד ---
+    showDesktopNotification(alertData.desc, points.map(p=>p.name), citiesData);
+    if(soundSelect.value !== "none" && enableSoundCheckbox.checked){
+        audio=new Audio(sounds[soundSelect.value]);
+        audio.loop=true;
+        audio.play();
+        soundBtn.textContent="⏸";
+        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="▶"; },8000);
+    }
+
+    // --- הצגת תיבת התרעה ---
+    alertActive = true;
+    const alertBox = document.getElementById('alert-box');
+    alertBox.innerHTML = alertData.desc.replace(/\n/g,"<br>");
+    alertBox.style.display='block';
+    const soundBox = document.getElementById('sound-box');
+    soundBox.style.display = 'none';
+    alertTimeout = setTimeout(()=>{
+        alertBox.style.display='none';
+        alertActive=false;
+        soundBox.style.display = 'flex';
+    },10000);
+
+    // --- פוליגונים לפי מרחק ---
+    function distanceKm(p1, p2){
+        const R=6371;
+        const dLat = (p2.lat-p1.lat)*Math.PI/180;
+        const dLng = (p2.lng-p1.lng)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(p1.lat*Math.PI/180)*Math.cos(p2.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+        const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R*c;
+    }
+    function clusterPoints(points, maxDistanceKm=10){
+        const clusters = [];
+        points.forEach(p=>{
+            let added=false;
+            for(const cluster of clusters){
+                if(cluster.some(q=>distanceKm(p,q)<=maxDistanceKm)){
+                    cluster.push(p);
+                    added=true;
+                    break;
+                }
+            }
+            if(!added) clusters.push([p]);
+        });
+        return clusters;
+    }
+
+    const clusters = clusterPoints(points);
+
+    activePolygons.forEach(p=>p.setMap(null));
+    activePolygons = [];
+
+    clusters.forEach(cluster=>{
+        const pathCoords = cluster.map(p=>({lat:p.lat,lng:p.lng}));
+        const polygon = new google.maps.Polygon({
+            paths: pathCoords,
+            strokeColor:'#FF0000',
+            strokeOpacity:1,
+            strokeWeight:2,
+            fillColor:'red',
+            fillOpacity:0.4,
+            map: map
+        });
+        activePolygons.push(polygon);
+    });
+
+    // --- התאמת המפה לפוליגונים ---
+    const bounds = new google.maps.LatLngBounds();
+    clusters.forEach(cluster=>{
+        cluster.forEach(p=> bounds.extend({lat:p.lat,lng:p.lng}));
+    });
+    if(clusters.length>0) map.fitBounds(bounds);
+
+    // --- הסרת הפוליגונים לאחר 10 שניות ---
+    setTimeout(()=>{
+        activePolygons.forEach(p=>p.setMap(null));
+        activePolygons=[];
+        map.setCenter({lat:31.5,lng:34.8});
+        map.setZoom(7);
+    },10000);
 });
-
 
 window.initMap = initMap;
 </script>

@@ -122,68 +122,26 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 .suggestion-city { font-weight: bold; }
 .suggestion-area { font-size: 12px; color: #aaa; }
 
-@media (max-width: 600px) {
-    #sound-box {
-        width: 90%;
-        right: 50%;
-        transform: translateX(50%);
-        top: auto;
-        bottom: 20px;
-        max-height: 50vh;
-    }
-    
-    .logo-overlay {
-        top: 10px;
-        right: 10px;
-        left: auto;
-        width: 50px;
-        height: 50px;
-    }
-    #alert-box {
-        bottom: 90px;
-        right: 10px;
-        max-width: 90%;
-    }
-    #city-suggestions,
-    #city-search,
-    #selected-cities {
-        display: none;
-    }
+.mobile-only { display: none !important; }
+.desktop-only { display: block !important; }
 
-    /* מובייל – תיבת סימון "הפעל סאונד" */
+@media (max-width: 600px) {
+    #sound-box { width:90%; right:50%; transform:translateX(50%); bottom:20px; max-height:50vh; }
+    .logo-overlay { top:10px; right:10px; left:auto; width:50px; height:50px; }
+    #alert-box { bottom:90px; right:10px; max-width:90%; }
+    #city-suggestions, #city-search, #selected-cities { display:none; }
+
     .mobile-only { display: block; }
     .desktop-only { display: none; }
-
-    #sound-box label input#notifyPermission {
-        display: none;
-    }
-    #sound-box label:has(input#notifyPermission) {
-        display: none;
-    }
 }
 
 @media (max-width: 900px) and (min-width: 601px) {
-    #sound-box {
-        width: 300px;
-        right: 10px;
-        top: auto;
-        bottom: 20px;
-        max-height: 70vh;
-    }
-    .logo-overlay {
-        top: 10px;
-        right: 10px;
-        left: auto;
-    }
+    #sound-box { width: 300px; right: 10px; top: auto; bottom: 20px; max-height: 70vh; }
+    .logo-overlay { top: 10px; right: 10px; left: auto; }
 }
 
 @media (min-width: 901px) {
-    #sound-box {
-        right: 20px;
-        top: 20px;
-        width: 300px;
-        max-height: 500px;
-    }
+    #sound-box { right: 20px; top: 20px; width: 300px; max-height: 500px; }
 }
 </style>
 </head>
@@ -195,7 +153,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 <div id="sound-box">
   <div id="datetime" style="color:white;font-weight:bold;"></div>
   
-  <!-- דסקטופ: רשימת סאונדים -->
   <label for="sound-select" class="desktop-only">בחר צליל התרעה:</label>
   <select id="sound-select" class="desktop-only">
     <option value="none" selected>ללא</option>
@@ -206,15 +163,12 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     <option value="beep">צפצוף</option>
   </select>
 
-  <!-- מובייל: תיבת סימון להפעלת סאונד -->
-  <label for="sound-mobile" class="mobile-only" style="cursor:pointer; display:none; margin-top:5px;">
+  <label for="sound-mobile" class="mobile-only" style="cursor:pointer; margin-top:5px;">
     <input type="checkbox" id="sound-mobile"> הפעל סאונד
   </label>
 
-  <!-- כפתור בדיקה -->
-  <button id="sound-btn" style="display:none;">בדוק</button>
+  <button id="sound-btn" class="mobile-only">בדוק</button>
 
-  <!-- אפשר קבלת התרעות בדפדפן -->
   <label style="margin-top:10px;cursor:pointer;">
     <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
   </label>

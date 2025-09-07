@@ -429,10 +429,12 @@ Promise.all([
       const alertBox = document.getElementById('alert-box');
       alertBox.innerHTML = message.replace(/\n/g,"<br>");
       alertBox.style.display='block';
-
+      const soundBox = document.getElementById('sound-box');
+      soundBox.style.display = 'none';
       alertTimeout = setTimeout(()=>{
         alertBox.style.display='none';
         alertActive=false;
+        soundBox.style.display = 'flex';
       },10000);
 
       let currentPolygons = [];

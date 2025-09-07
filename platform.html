@@ -18,14 +18,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 80px;
     box-sizing: border-box;
-    overflow: hidden; /* במחשב לא תהיה גלילה */
     height: 100vh;
+    overflow: hidden; /* במחשב לא תהיה גלילה */
+    padding-top: 80px;
   }
 
   .logo-overlay {
-    position: fixed;
+    position: fixed; /* קבוע */
     top: 10px;
     left: 10px;
     width: 60px;
@@ -52,15 +52,19 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
+    align-content: center;
     width: 95%;
     max-width: 900px;
-    gap: 15px;
+    gap: 20px;
     flex-grow: 1;
+    height: 100%; /* מתאים לגובה המסך */
+    overflow: hidden; /* אין גלילה במחשב */
   }
 
   .platform-card {
-    flex: 1 1 45%;
+    flex: 1 1 40%;
     min-width: 200px;
+    max-width: 300px;
     background-color: white;
     border-radius: 12px;
     padding: 20px;
@@ -96,16 +100,17 @@
     font-size: 20px;
     color: #333;
     transition: color 0.3s;
+    word-break: break-word;
   }
 
   .platform-card:hover h2 { color: #ff4444; }
 
   @media (max-width: 900px) {
-    .platform-card { flex: 1 1 40%; }
+    .platform-card { flex: 1 1 45%; }
   }
 
   @media (max-width: 600px) {
-    body { overflow-y: auto; } /* במובייל גלילה אפשרית */
+    body { overflow-y: auto; } /* בגלילה בנייד */
     h1 { font-size: 28px; margin-bottom: 20px; }
     .platform-card { flex: 1 1 100%; padding: 15px; }
     .platform-card img { width: 50px; height: 50px; margin-top: 10px; }
@@ -122,7 +127,6 @@
 <h1>רדאר 📡 - פלטפורמות</h1>
 
 <div class="platforms-container">
-  
   <div class="platform-card" onclick="window.open('https://t.me/Radar_Alerts', '_blank')">
     <h2>ערוץ טלגרם</h2>
     <img src="telegram_1.png" alt="Telegram Logo">

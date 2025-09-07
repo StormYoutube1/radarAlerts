@@ -131,7 +131,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         bottom: 20px;
         max-height: 50vh;
     }
-    
+
     .logo-overlay {
         top: 10px;
         right: 10px;
@@ -139,29 +139,27 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         width: 50px;
         height: 50px;
     }
+
     #alert-box {
         bottom: 90px;
         right: 10px;
         max-width: 90%;
     }
-    #city-suggestions,
+
+    /* הסתרת חיפוש ערים */
     #city-search,
+    #city-suggestions,
     #selected-cities {
         display: none;
     }
-    
-    /* תיבת סימון סאונד בנייד */
-    #sound-box label#mobile-sound-label,
-    #sound-box button#sound-btn {
-        display: block;
-    }
-}
-@media (min-width: 601px) {
-    #sound-box label#mobile-sound-label,
-    #sound-box button#sound-btn {
+
+    /* הסתרת הרשאת התראות */
+    #sound-box label input#notifyPermission,
+    #sound-box label:has(input#notifyPermission) {
         display: none;
     }
 }
+
 @media (max-width: 900px) and (min-width: 601px) {
     #sound-box {
         width: 300px;
@@ -176,6 +174,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         left: auto;
     }
 }
+
 @media (min-width: 901px) {
     #sound-box {
         right: 20px;
@@ -194,21 +193,24 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 <div id="sound-box">
   <div id="datetime" style="color:white;font-weight:bold;"></div>
 
+  <!-- תיבת סימון נייד -->
+  <label style="margin-top:10px;cursor:pointer;" id="mobile-sound-label">
+    <input type="checkbox" id="mobile-sound-toggle"> הפעל סאונד
+  </label>
+
   <label for="sound-select">בחר צליל התרעה:</label>
   <select id="sound-select">
-    <option value="none" selected>ללא</option>
     <option value="alert">התרעה</option>
     <option value="calm">רגוע</option>
     <option value="siren">אזעקה</option>
     <option value="homefront">פיקוד העורף</option>
     <option value="beep">צפצוף</option>
   </select>
-
-  <!-- תיבת סימון ובדוק לנייד בלבד -->
-  <label id="mobile-sound-label" style="margin-top:10px;cursor:pointer;">
-    <input type="checkbox" id="notifyPermission"> הפעל סאונד
-  </label>
   <button id="sound-btn">בדוק</button>
+
+  <label style="margin-top:10px;cursor:pointer;">
+    <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
+  </label>
 
   <input type="text" id="city-search" placeholder="הקלד יישוב כדי לקבל התרעות רק עבורו...">
   <div id="city-suggestions"></div>
@@ -224,6 +226,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
             לפלטפורמות שלנו
           </button>
     </div>
+  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -251,36 +254,47 @@ let selectedCities = [];
 
 const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3", alert: "siren.mp3", beep: "beep.wav" };
 
-// --- סאונד לנייד בלבד ---
-const mobileCheckbox = document.getElementById("notifyPermission");
-const soundBtn = document.getElementById("sound-btn");
-const soundSelect = document.getElementById("sound-select");
-
-function updateSoundButton() {
-    if(window.innerWidth <= 600){
-        soundBtn.style.display = soundSelect.value==="none"?"none":"block";
-        soundBtn.textContent="בדוק";
-    } else {
-        soundBtn.style.display = "none";
-    }
+// --- הרשאת התראות דסקטופ ---
+const notifyCheckbox = document.getElementById("notifyPermission");
+function updateNotifyCheckbox() {
+  desktopPermissionGranted = Notification.permission === "granted";
+  notifyCheckbox.checked = false;
+  notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
 }
-soundSelect.addEventListener("change", updateSoundButton);
-
-soundBtn.addEventListener("click", ()=>{
-    if(!mobileCheckbox.checked || soundSelect.value==="none") return;
-    if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק"; } 
-    else{ audio=new Audio(sounds[soundSelect.value]); audio.loop=true; audio.play(); soundBtn.textContent="עצור";
-        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
-    }
+notifyCheckbox.addEventListener("change", function() {
+  if (this.checked && "Notification" in window) {
+    Notification.requestPermission().then(permission => {
+      desktopPermissionGranted = permission === "granted";
+      if (!desktopPermissionGranted) this.checked = false;
+    });
+  } else {
+    desktopPermissionGranted = false;
+  }
 });
+updateNotifyCheckbox();
 
-// --- תאריך ושעה ---
-function updateDateTime() {
+// --- הצגת התראה בדסקטופ ---
+function showDesktopNotification(message, citiesInMessage, citiesData) {
+  if (!desktopPermissionGranted) return;
+  const firstLine = message.split("\n").find(l => l.trim() !== "");
+  const title = firstLine || "🚨 התרעה";
+  const areasSet = new Set();
+  citiesInMessage.forEach(city => {
+    const cityObj = Object.values(citiesData.cities).find(c => c.he === city);
+    if (cityObj && cityObj.area) {
+      const areaId = cityObj.area;
+      const areaName = citiesData.areas[areaId]?.he;
+      if (areaName) areasSet.add(areaName);
+    }
+  });
+  const areasList = Array.from(areasSet).sort((a,b)=> a.localeCompare(b, 'he')).join(", ");
   const now = new Date();
-  const options = {timeZone:'Asia/Jerusalem', hour12:false};
-  document.getElementById("datetime").textContent = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
+  const options = { timeZone: 'Asia/Jerusalem', hour12:false };
+  const dateTimeStr = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
+  const body = `${areasList}\n\n${dateTimeStr}\n\nרדאר 📡 - צבע אדום`;
+  const notification = new Notification(title, { body: body, icon: 'cropped_circle_image.png' });
+  notification.onclick = () => window.focus();
 }
-setInterval(updateDateTime,1000); updateDateTime();
 
 // --- מפה ---
 function initMap() {
@@ -301,30 +315,31 @@ function addFlashingMarker(lat, lng, message) {
   setTimeout(() => { marker.setMap(null); clearInterval(flashInterval); markers = markers.filter(m => m!==marker); }, 10000);
 }
 
-// --- סאונד (מובייל + דסקטופ) ---
+// --- סאונד דסקטופ + מובייל ---
+const soundSelect = document.getElementById("sound-select");
+const soundBtn = document.getElementById("sound-btn");
 const mobileSoundToggle = document.getElementById("mobile-sound-toggle");
-const soundSelectEl = document.getElementById("sound-select");
-const soundBtnEl = document.getElementById("sound-btn");
 
-function playSoundTest() {
-  // במובייל: לבדוק אם התיבה מסומנת
-  if(window.innerWidth <=600 && !mobileSoundToggle.checked) return;
+function toggleSound() {
+  const isMobile = window.innerWidth <= 600;
+  const selected = soundSelect.value;
 
-  const selected = soundSelectEl.value;
-  if(selected==="") return;
+  if(isMobile){
+    if(!mobileSoundToggle.checked) return;
+  }
 
-  if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtnEl.textContent="בדוק"; } 
-  else {
+  if(selected==="none" || !selected) return;
+
+  if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק"; } 
+  else{
     audio=new Audio(sounds[selected]);
     audio.loop=true;
     audio.play();
-    soundBtnEl.textContent="עצור";
-    audioTimeout=setTimeout(()=>{
-      audio.pause(); audio=null; soundBtnEl.textContent="בדוק";
-    },8000);
+    soundBtn.textContent="עצור";
+    audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
   }
 }
-soundBtnEl.addEventListener("click", playSoundTest);
+soundBtn.addEventListener("click", toggleSound);
 
 // --- תאריך ושעה ---
 function updateDateTime() {
@@ -334,13 +349,12 @@ function updateDateTime() {
 }
 setInterval(updateDateTime,1000); updateDateTime();
 
-// --- טעינת JSONs וטעינת התרעות ---
+// --- טעינת JSONs + הצגת התראות ---
 Promise.all([
   fetch('citiess.json').then(res => res.json()),
   fetch('areas.json').then(res => res.json()),
   fetch('cleaned_fine.json').then(res => res.json())
 ]).then(([citiesData, areasData, polygonsData]) => {
-
   Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
   validAreas = areasData;
   if(!map)initMap();
@@ -388,6 +402,7 @@ Promise.all([
 
     if (showAlert && citiesInMessage.length > 0) {
 
+      // --- עצירת התרעה קודמת אם קיימת ---
       if(alertActive){
         if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); }
         const alertBox = document.getElementById('alert-box');
@@ -402,15 +417,16 @@ Promise.all([
 
       showDesktopNotification(message, citiesInMessage, citiesData);
 
-      // סאונד בזמן אמת
-      const isMobile = window.innerWidth<=600;
-      if((isMobile && mobileSoundToggle.checked) || (!isMobile && soundSelectEl.value!=="none")){
-        const selected = soundSelectEl.value;
-        audio=new Audio(sounds[selected]);
-        audio.loop=true;
-        audio.play();
-        soundBtnEl.textContent="עצור";
-        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtnEl.textContent="בדוק"; },8000);
+      const isMobile = window.innerWidth <= 600;
+      if(!isMobile || (isMobile && mobileSoundToggle.checked)){
+        const selected = soundSelect.value;
+        if(selected!=="none"){
+          audio=new Audio(sounds[selected]);
+          audio.loop=true;
+          audio.play();
+          soundBtn.textContent="עצור";
+          audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
+        }
       }
 
       alertActive = true;
@@ -443,7 +459,7 @@ Promise.all([
     }
   });
 
-  // חיפוש ערים + הצעות
+  // --- חיפוש ערים + הצעות ---
   const searchInput = document.getElementById("city-search");
   const suggestionsBox = document.getElementById("city-suggestions");
   const selectedCitiesContainer = document.getElementById("selected-cities");
@@ -452,12 +468,14 @@ Promise.all([
     suggestionsBox.innerHTML = "";
     list.slice(0,8).forEach(c=>{
       const areaName = c.area && citiesData.areas[c.area] ? citiesData.areas[c.area].he : "";
-      const div=document.createElement("div");
-      div.className="suggestion-item";
-      div.innerHTML=`<span class="suggestion-city">${c.he}</span> <small class="suggestion-area">${areaName}</small>`;
+      const div = document.createElement("div");
+      div.className = "suggestion-item";
+      div.innerHTML = `<span class="suggestion-city">${c.he}</span> <span class="suggestion-area">${areaName}</span>`;
       div.addEventListener("click", ()=>{
-        if(!selectedCities.includes(c.he)) selectedCities.push(c.he);
-        renderSelectedCities();
+        if(!selectedCities.includes(c.he)){
+          selectedCities.push(c.he);
+          renderSelectedCities();
+        }
         searchInput.value="";
         suggestionsBox.innerHTML="";
       });
@@ -470,26 +488,29 @@ Promise.all([
     selectedCities.forEach(city=>{
       const div=document.createElement("div");
       div.className="selected-city";
-      div.innerHTML=`<span class="remove" onclick="removeCity('${city}')">×</span><strong>${city}</strong>`;
+      div.innerHTML=`<span class="remove" data-city="${city}">x</span><strong>${city}</strong>`;
       selectedCitiesContainer.appendChild(div);
+    });
+    selectedCitiesContainer.querySelectorAll(".remove").forEach(el=>{
+      el.addEventListener("click", ()=>{ selectedCities = selectedCities.filter(c=>c!==el.dataset.city); renderSelectedCities(); });
     });
   }
 
   searchInput.addEventListener("input", ()=>{
-    const term = searchInput.value.trim();
-    if(!term){ suggestionsBox.innerHTML=""; return; }
-    const results = Object.values(citiesData.cities).filter(c=>c.he.includes(term));
-    renderSuggestions(results);
+    const val = searchInput.value.trim();
+    if(!val){ suggestionsBox.innerHTML=""; return; }
+    const matches = Object.values(citiesData.cities).filter(c=>c.he.includes(val));
+    renderSuggestions(matches);
   });
 
-  window.removeCity=function(city){ selectedCities = selectedCities.filter(c=>c!==city); renderSelectedCities(); }
 });
 
+// --- מיקום + זום אוטומטי ---
 function fitMapToMarkersAndPolygons(){
   const bounds = new google.maps.LatLngBounds();
   markers.forEach(m=>bounds.extend(m.getPosition()));
   activePolygons.forEach(p=>{
-    p.getPath().forEach(latlng=>bounds.extend(latlng));
+    p.getPath().forEach(latlng => bounds.extend(latlng));
   });
   if(!bounds.isEmpty()) map.fitBounds(bounds);
 }

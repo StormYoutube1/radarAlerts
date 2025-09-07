@@ -131,7 +131,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         bottom: 20px;
         max-height: 50vh;
     }
-
+    
     .logo-overlay {
         top: 10px;
         right: 10px;
@@ -139,29 +139,29 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         width: 50px;
         height: 50px;
     }
-
     #alert-box {
         bottom: 90px;
         right: 10px;
         max-width: 90%;
     }
-
-    #city-search,
     #city-suggestions,
+    #city-search,
     #selected-cities {
         display: none;
     }
-
-    /* הסתרת הרשאת התראות רגילה */
-    #sound-box label input#notifyPermission,
-    #sound-box label:has(input#notifyPermission) {
+    
+    /* תיבת סימון סאונד בנייד */
+    #sound-box label#mobile-sound-label,
+    #sound-box button#sound-btn {
+        display: block;
+    }
+}
+@media (min-width: 601px) {
+    #sound-box label#mobile-sound-label,
+    #sound-box button#sound-btn {
         display: none;
     }
-
-    /* הרשימה הנפתחת של סאונדים - הסתרת "ללא" */
-    #sound-select option[value="none"] { display: none; }
 }
-
 @media (max-width: 900px) and (min-width: 601px) {
     #sound-box {
         width: 300px;
@@ -194,27 +194,22 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 <div id="sound-box">
   <div id="datetime" style="color:white;font-weight:bold;"></div>
 
-  <!-- סאונד למובייל -->
-  <label style="margin-top:10px;cursor:pointer;" id="mobile-sound-label">
-    <input type="checkbox" id="mobile-sound-toggle"> הפעל סאונד
-  </label>
-
   <label for="sound-select">בחר צליל התרעה:</label>
   <select id="sound-select">
+    <option value="none" selected>ללא</option>
     <option value="alert">התרעה</option>
     <option value="calm">רגוע</option>
     <option value="siren">אזעקה</option>
     <option value="homefront">פיקוד העורף</option>
     <option value="beep">צפצוף</option>
   </select>
+
+  <!-- תיבת סימון ובדוק לנייד בלבד -->
+  <label id="mobile-sound-label" style="margin-top:10px;cursor:pointer;">
+    <input type="checkbox" id="notifyPermission"> הפעל סאונד
+  </label>
   <button id="sound-btn">בדוק</button>
 
-  <!-- הרשאת התרעות בדסקטופ -->
-  <label style="margin-top:10px;cursor:pointer;">
-    <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
-  </label>
-
-  <!-- חיפוש ערים (הוסתר בנייד) -->
   <input type="text" id="city-search" placeholder="הקלד יישוב כדי לקבל התרעות רק עבורו...">
   <div id="city-suggestions"></div>
   <div id="selected-cities"></div>
@@ -256,52 +251,36 @@ let selectedCities = [];
 
 const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3", alert: "siren.mp3", beep: "beep.wav" };
 
-// --- הרשאת התראות בדסקטופ ---
-const notifyCheckbox = document.getElementById("notifyPermission");
-function updateNotifyCheckbox() {
-  desktopPermissionGranted = Notification.permission === "granted";
-  notifyCheckbox.checked = false;
-  notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
-}
-notifyCheckbox.addEventListener("change", function() {
-  if (this.checked && "Notification" in window) {
-    Notification.requestPermission().then(permission => {
-      desktopPermissionGranted = permission === "granted";
-      if (!desktopPermissionGranted) this.checked = false;
-    });
-  } else {
-    desktopPermissionGranted = false;
-  }
-});
-updateNotifyCheckbox();
+// --- סאונד לנייד בלבד ---
+const mobileCheckbox = document.getElementById("notifyPermission");
+const soundBtn = document.getElementById("sound-btn");
+const soundSelect = document.getElementById("sound-select");
 
-// --- הצגת התראה בדסקטופ ---
-function showDesktopNotification(message, citiesInMessage, citiesData) {
-  if (!desktopPermissionGranted) return;
-
-  const firstLine = message.split("\n").find(l => l.trim() !== "");
-  const title = firstLine || "🚨 התרעה";
-
-  const areasSet = new Set();
-  citiesInMessage.forEach(city => {
-    const cityObj = Object.values(citiesData.cities).find(c => c.he === city);
-    if (cityObj && cityObj.area) {
-      const areaId = cityObj.area;
-      const areaName = citiesData.areas[areaId]?.he;
-      if (areaName) areasSet.add(areaName);
+function updateSoundButton() {
+    if(window.innerWidth <= 600){
+        soundBtn.style.display = soundSelect.value==="none"?"none":"block";
+        soundBtn.textContent="בדוק";
+    } else {
+        soundBtn.style.display = "none";
     }
-  });
-  const areasList = Array.from(areasSet).sort((a,b)=> a.localeCompare(b, 'he')).join(", ");
-
-  const now = new Date();
-  const options = { timeZone: 'Asia/Jerusalem', hour12:false };
-  const dateTimeStr = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
-
-  const body = `${areasList}\n\n${dateTimeStr}\n\nרדאר 📡 - צבע אדום`;
-
-  const notification = new Notification(title, { body: body, icon: 'cropped_circle_image.png' });
-  notification.onclick = () => window.focus();
 }
+soundSelect.addEventListener("change", updateSoundButton);
+
+soundBtn.addEventListener("click", ()=>{
+    if(!mobileCheckbox.checked || soundSelect.value==="none") return;
+    if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק"; } 
+    else{ audio=new Audio(sounds[soundSelect.value]); audio.loop=true; audio.play(); soundBtn.textContent="עצור";
+        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
+    }
+});
+
+// --- תאריך ושעה ---
+function updateDateTime() {
+  const now = new Date();
+  const options = {timeZone:'Asia/Jerusalem', hour12:false};
+  document.getElementById("datetime").textContent = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
+}
+setInterval(updateDateTime,1000); updateDateTime();
 
 // --- מפה ---
 function initMap() {

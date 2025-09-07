@@ -131,7 +131,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         max-height: 50vh;
     }
     #sound-btn {
-        display: block !important;
+        display: none;
         width: 100%;             /* למלא את רוחב המלבן */
         padding: 8px;
         margin-top: 5px;
@@ -323,6 +323,7 @@ const soundSelect = document.getElementById("sound-select");
 const soundBtn = document.getElementById("sound-btn");
 function updateSoundButton() { soundBtn.style.display = soundSelect.value==="none"?"none":"block"; soundBtn.textContent="בדוק"; }
 soundSelect.addEventListener("change", updateSoundButton);
+updateSoundButton();
 function toggleSound() {
   const selected = soundSelect.value;
   if(selected==="none") return;

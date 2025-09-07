@@ -122,7 +122,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 .suggestion-city { font-weight: bold; }
 .suggestion-area { font-size: 12px; color: #aaa; }
 
-/* ====== MEDIA QUERIES ====== */
 @media (max-width: 600px) {
     #sound-box {
         width: 90%;
@@ -150,9 +149,20 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         display: none;
     }
 
-    /* תיבת סימון מובייל בלבד */
-    #sound-box label.checkbox-mobile { display: block; cursor: pointer; }
-    #sound-box label.checkbox-desktop { display: none; }
+    /* הסתרת תיבת הסימון הקיימת */
+    #sound-box label input#notifyPermission {
+        display: none;
+    }
+    #sound-box label:has(input#notifyPermission) {
+        display: none;
+    }
+
+    /* תיבת סימון חדשה רק למובייל */
+    #sound-box label.mobile-alert-checkbox {
+        display: block;
+        margin-top: 10px;
+        cursor: pointer;
+    }
 }
 @media (max-width: 900px) and (min-width: 601px) {
     #sound-box {
@@ -175,9 +185,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         width: 300px;
         max-height: 500px;
     }
-    /* תיבת סימון דסקטופ נשארת כפי שהיא */
-    #sound-box label.checkbox-mobile { display: none; }
-    #sound-box label.checkbox-desktop { display: block; cursor: pointer; }
 }
 </style>
 </head>
@@ -199,13 +206,14 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   </select>
   <button id="sound-btn" style="display:none;">בדוק</button>
 
-  <!-- Checkbox מובייל בלבד -->
-  <label class="checkbox-mobile">
+  <!-- תיבת סימון קיימת לדסקטופ בלבד -->
+  <label style="margin-top:10px;cursor:pointer;">
     <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
   </label>
-  <!-- Checkbox דסקטופ -->
-  <label class="checkbox-desktop">
-    <input type="checkbox" id="notifyPermissionDesktop"> אפשר קבלת התרעות בדפדפן
+
+  <!-- תיבת סימון חדשה רק למובייל -->
+  <label class="mobile-alert-checkbox" style="display:none;">
+    <input type="checkbox" id="mobileNotifyPermission"> אפשר קבלת התרעות מובייל
   </label>
 
   <input type="text" id="city-search" placeholder="הקלד יישוב כדי לקבל התרעות רק עבורו...">
@@ -248,26 +256,26 @@ let selectedCities = [];
 
 const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3", alert: "siren.mp3", beep: "beep.wav" };
 
-// --- הרשאת התראות מובייל בלבד ---
+// --- הרשאת התראות ---
 const notifyCheckbox = document.getElementById("notifyPermission");
-if(notifyCheckbox){
-    function updateNotifyCheckbox() {
-      desktopPermissionGranted = Notification.permission === "granted";
-      notifyCheckbox.checked = false;
-      notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
-    }
-    notifyCheckbox.addEventListener("change", function() {
-      if (this.checked && "Notification" in window) {
-        Notification.requestPermission().then(permission => {
-          desktopPermissionGranted = permission === "granted";
-          if (!desktopPermissionGranted) this.checked = false;
-        });
-      } else {
-        desktopPermissionGranted = false;
-      }
-    });
-    updateNotifyCheckbox();
+function updateNotifyCheckbox() {
+  desktopPermissionGranted = Notification.permission === "granted";
+  
+  notifyCheckbox.checked = false;
+  notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
 }
+ 
+notifyCheckbox.addEventListener("change", function() {
+  if (this.checked && "Notification" in window) {
+    Notification.requestPermission().then(permission => {
+      desktopPermissionGranted = permission === "granted";
+      if (!desktopPermissionGranted) this.checked = false;
+    });
+  } else {
+    desktopPermissionGranted = false;
+  }
+});
+updateNotifyCheckbox();
 
 // --- הצגת התראה בדסקטופ ---
 function showDesktopNotification(message, citiesInMessage, citiesData) {

@@ -39,30 +39,67 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 }
 .logo-overlay img { width: 100%; height: 100%; object-fit: cover; }
 
+/* --- תיבת ההגדרות --- */
 #sound-box {
   position: absolute;
   top: 20px;
   right: 20px;
-  background: rgba(17,17,17,0.95);
+  background: rgba(25,25,25,0.95);
   color: white;
-  padding: 15px;
-  border-radius: 15px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  padding: 18px;
+  border-radius: 20px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.5);
   z-index: 1001;
-  width: 300px;
-  max-height: 500px;
+  width: 320px;
+  max-height: 520px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+  font-size: 14px;
 }
 
-#sound-box label, #sound-box select, #sound-box button {
-  display: block;
+/* כותרות קטגוריה */
+#sound-box .section-title {
+  font-weight: bold;
+  font-size: 15px;
+  color: #ff0000; /* אדום במקום צהוב */
+  margin-bottom: 6px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 3px;
+}
+
+/* שדות וטפסים */
+#sound-box label, 
+#sound-box select, 
+#sound-box button, 
+#sound-box input[type="text"] {
+  font-size: 14px;
+}
+
+#sound-box button {
   margin-top: 5px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #333;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
 }
-#sound-box button { margin-top: 10px; }
+#sound-box button:hover { background: #555; }
 
+#sound-box select, #city-search {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+  background: #222;
+  color: white;
+}
+
+/* ערים נבחרות */
 #selected-cities {
   display: flex;
   flex-direction: column;
@@ -71,18 +108,15 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   overflow-y: auto;
   padding-right: 3px;
 }
-
 .selected-city {
-  background: #222;
+  background: #2a2a2a;
   border-radius: 6px;
   padding: 5px 8px;
   font-size: 14px;
   line-height: 1.3em;
 }
-
 .selected-city strong { display: block; }
 .selected-city small { color: #aaa; font-size: 12px; display: block; margin-top: 2px; }
-
 .selected-city span.remove {
   cursor: pointer;
   color: #f55;
@@ -91,15 +125,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   float: left;
 }
 
-#city-search {
-  width: calc(100% - 12px);
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: none;
-  outline: none;
-  font-size: 14px;
-}
-
+/* הצעות חיפוש */
 #city-suggestions {
   background: rgba(34,34,34,0.95);
   border-radius: 8px;
@@ -110,7 +136,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   position: relative;
   z-index: 2000;
 }
-
 .suggestion-item {
   padding: 6px 8px;
   cursor: pointer;
@@ -118,9 +143,10 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   margin-bottom: 2px;
 }
 .suggestion-item:hover { background: #444; }
-
 .suggestion-city { font-weight: bold; }
 .suggestion-area { font-size: 12px; color: #aaa; }
+
+/* רספונסיביות */
 @media (max-width: 600px) {
     #sound-box {
         width: 90%;
@@ -172,8 +198,8 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     #sound-box {
         right: 20px;
         top: 20px;
-        width: 300px;
-        max-height: 500px;
+        width: 320px;
+        max-height: 520px;
     }
 }
 </style>
@@ -184,17 +210,14 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 <div id="alert-box" class="info-box"></div>
 
 <div id="sound-box">
-  <div id="datetime" style="color:white;font-weight:bold;"></div>
+  <div id="datetime" style="color:white;font-weight:bold;text-align:center;"></div>
 
-  <!-- תיבת סימון -->
+  <div class="section-title">🔊 | צלילים</div>
   <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
-    <input type="checkbox" id="enable-sound">
-    הפעל צליל התרעה
+    <input type="checkbox" id="enable-sound"> הפעל צליל התרעה
   </label>
-
-  <!-- רשימה נפתחת של סאונדים עם כפתור בדיקה -->
-  <div style="display:flex; align-items:center; gap:5px; margin-top:5px;">
-    <button id="sound-btn">בדוק</button>
+  <div style="display:flex; align-items:center; gap:5px; flex-direction:row-reverse;">
+    <button id="sound-btn">▶</button>
     <select id="sound-select">
       <option value="alert">התרעה</option>
       <option value="calm">רגוע</option>
@@ -204,12 +227,13 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     </select>
   </div>
 
-  <!-- הרשאות דפדפן -->
-  <label style="margin-top:10px;cursor:pointer;">
+  <div class="section-title">🔔 | התראות דפדפן</div>
+  <label style="margin-top:5px;cursor:pointer;">
     <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
   </label>
 
-  <input type="text" id="city-search" placeholder="הקלד יישוב כדי לקבל התרעות רק עבורו...">
+  <div class="section-title">🔍 | סינון לפי יישוב</div>
+  <input type="text" id="city-search" placeholder="הקלד יישוב...">
   <div id="city-suggestions"></div>
   <div id="selected-cities"></div>
 
@@ -218,13 +242,26 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
           רדאר 📡 - צבע אדום
       </div>
       <div style="border-top:1px solid #555; padding-top:10px; display:flex; justify-content:center; margin-top:10px;">
-          <button onclick="window.location.href='platform.html'"
-                  style="padding:6px 12px; border:none; border-radius:6px; background:#444; color:white; cursor:pointer;">
-            לפלטפורמות שלנו
-          </button>
+          <button onclick="window.location.href='platform.html'">לפלטפורמות שלנו</button>
       </div>
   </div>
 </div>
+
+<script>
+function renderDateTimeBox() {
+    const days = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+    const now = new Date();
+    const day = days[now.getDay()];
+    const date = now.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const time = now.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    document.getElementById("datetime").innerText = `${day} | ${date} | ${time}`;
+}
+setInterval(renderDateTimeBox, 1000);
+renderDateTimeBox();
+</script>
+</body>
+</html>
+
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -329,24 +366,18 @@ function toggleSound() {
   if(!selected || !enableSoundCheckbox.checked) return;
 
   if(audio){ 
-    audio.pause(); audio=null; clearTimeout(audioTimeoutLocal); soundBtn.textContent="בדוק"; 
+    audio.pause(); audio=null; clearTimeout(audioTimeoutLocal); soundBtn.textContent="▶"; 
   } else { 
-    audio=new Audio(sounds[selected]); audio.loop=true; audio.play(); soundBtn.textContent="עצור";
-    audioTimeoutLocal=setTimeout(()=>{ if(audio){ audio.pause(); audio=null; soundBtn.textContent="בדוק"; } },8000);
+    audio=new Audio(sounds[selected]); audio.loop=true; audio.play(); soundBtn.textContent="⏸";
+    audioTimeoutLocal=setTimeout(()=>{ if(audio){ audio.pause(); audio=null; soundBtn.textContent="▶"; } },8000);
   }
 }
 soundBtn.addEventListener("click", toggleSound);
-function updateSoundButton() { soundBtn.style.display = soundSelect.value ? "block" : "none"; soundBtn.textContent="בדוק"; }
+function updateSoundButton() { soundBtn.style.display = soundSelect.value ? "block" : "none"; soundBtn.textContent="▶"; }
 soundSelect.addEventListener("change", updateSoundButton);
 updateSoundButton();
 
-// --- תאריך ושעה ---
-function updateDateTime() {
-  const now = new Date();
-  const options = {timeZone:'Asia/Jerusalem', hour12:false};
-  document.getElementById("datetime").textContent = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
-}
-setInterval(updateDateTime,1000); updateDateTime();
+
 
 // --- טעינת JSONs ---
 Promise.all([
@@ -423,8 +454,8 @@ Promise.all([
         audio=new Audio(sounds[soundSelect.value]);
         audio.loop=true;
         audio.play();
-        soundBtn.textContent="עצור";
-        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
+        soundBtn.textContent="⏸";
+        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="▶"; },8000);
       }
 
       alertActive = true;

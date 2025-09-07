@@ -121,6 +121,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 
 .suggestion-city { font-weight: bold; }
 .suggestion-area { font-size: 12px; color: #aaa; }
+
 @media (max-width: 600px) {
     #sound-box {
         width: 90%;
@@ -130,6 +131,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         bottom: 20px;
         max-height: 50vh;
     }
+
     .logo-overlay {
         top: 10px;
         right: 10px;
@@ -137,23 +139,29 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         width: 50px;
         height: 50px;
     }
+
     #alert-box {
         bottom: 90px;
         right: 10px;
         max-width: 90%;
     }
-    #city-suggestions,
+
     #city-search,
+    #city-suggestions,
     #selected-cities {
         display: none;
     }
-    #sound-box label input#notifyPermission {
-        display: none;
-    }
+
+    /* הסתרת הרשאת התראות רגילה */
+    #sound-box label input#notifyPermission,
     #sound-box label:has(input#notifyPermission) {
         display: none;
     }
+
+    /* הרשימה הנפתחת של סאונדים - הסתרת "ללא" */
+    #sound-select option[value="none"] { display: none; }
 }
+
 @media (max-width: 900px) and (min-width: 601px) {
     #sound-box {
         width: 300px;
@@ -185,24 +193,32 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 
 <div id="sound-box">
   <div id="datetime" style="color:white;font-weight:bold;"></div>
+
+  <!-- סאונד למובייל -->
+  <label style="margin-top:10px;cursor:pointer;" id="mobile-sound-label">
+    <input type="checkbox" id="mobile-sound-toggle"> הפעל סאונד
+  </label>
+
   <label for="sound-select">בחר צליל התרעה:</label>
   <select id="sound-select">
-    <option value="none" selected>ללא</option>
     <option value="alert">התרעה</option>
     <option value="calm">רגוע</option>
     <option value="siren">אזעקה</option>
     <option value="homefront">פיקוד העורף</option>
     <option value="beep">צפצוף</option>
   </select>
-  <button id="sound-btn" style="display:none;">בדוק</button>
+  <button id="sound-btn">בדוק</button>
 
+  <!-- הרשאת התרעות בדסקטופ -->
   <label style="margin-top:10px;cursor:pointer;">
     <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
   </label>
 
+  <!-- חיפוש ערים (הוסתר בנייד) -->
   <input type="text" id="city-search" placeholder="הקלד יישוב כדי לקבל התרעות רק עבורו...">
   <div id="city-suggestions"></div>
   <div id="selected-cities"></div>
+
   <div style="margin-top:auto; text-align:center; padding-top:10px;">
       <div style="border-top:1px solid #555; padding-top:5px; color:#ff4444; font-weight:bold;">
           רדאר 📡 - צבע אדום
@@ -240,15 +256,13 @@ let selectedCities = [];
 
 const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3", alert: "siren.mp3", beep: "beep.wav" };
 
-// --- הרשאת התראות ---
+// --- הרשאת התראות בדסקטופ ---
 const notifyCheckbox = document.getElementById("notifyPermission");
 function updateNotifyCheckbox() {
   desktopPermissionGranted = Notification.permission === "granted";
-  
   notifyCheckbox.checked = false;
   notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
 }
- 
 notifyCheckbox.addEventListener("change", function() {
   if (this.checked && "Notification" in window) {
     Notification.requestPermission().then(permission => {
@@ -308,29 +322,30 @@ function addFlashingMarker(lat, lng, message) {
   setTimeout(() => { marker.setMap(null); clearInterval(flashInterval); markers = markers.filter(m => m!==marker); }, 10000);
 }
 
-// --- סאונד ---
-const soundSelect = document.getElementById("sound-select");
-const soundBtn = document.getElementById("sound-btn");
-function updateSoundButton() {
-    const isMobile = window.matchMedia("(max-width: 600px)").matches;
-    if(soundSelect.value === "none") {
-        soundBtn.style.display = "none";
-    } else {
-        soundBtn.style.display = "block";
-        soundBtn.textContent = "בדוק";
-    }
-}
-soundSelect.addEventListener("change", updateSoundButton);
-updateSoundButton();
-function toggleSound() {
-  const selected = soundSelect.value;
-  if(selected==="none") return;
-  if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtn.textContent="בדוק"; } 
-  else{ audio=new Audio(sounds[selected]); audio.loop=true; audio.play(); soundBtn.textContent="עצור";
-    audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
+// --- סאונד (מובייל + דסקטופ) ---
+const mobileSoundToggle = document.getElementById("mobile-sound-toggle");
+const soundSelectEl = document.getElementById("sound-select");
+const soundBtnEl = document.getElementById("sound-btn");
+
+function playSoundTest() {
+  // במובייל: לבדוק אם התיבה מסומנת
+  if(window.innerWidth <=600 && !mobileSoundToggle.checked) return;
+
+  const selected = soundSelectEl.value;
+  if(selected==="") return;
+
+  if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); soundBtnEl.textContent="בדוק"; } 
+  else {
+    audio=new Audio(sounds[selected]);
+    audio.loop=true;
+    audio.play();
+    soundBtnEl.textContent="עצור";
+    audioTimeout=setTimeout(()=>{
+      audio.pause(); audio=null; soundBtnEl.textContent="בדוק";
+    },8000);
   }
 }
-soundBtn.addEventListener("click", toggleSound);
+soundBtnEl.addEventListener("click", playSoundTest);
 
 // --- תאריך ושעה ---
 function updateDateTime() {
@@ -340,7 +355,7 @@ function updateDateTime() {
 }
 setInterval(updateDateTime,1000); updateDateTime();
 
-// --- טעינת JSONs ---
+// --- טעינת JSONs וטעינת התרעות ---
 Promise.all([
   fetch('citiess.json').then(res => res.json()),
   fetch('areas.json').then(res => res.json()),
@@ -394,7 +409,6 @@ Promise.all([
 
     if (showAlert && citiesInMessage.length > 0) {
 
-      // --- עצירת התרעה קודמת אם קיימת ---
       if(alertActive){
         if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); }
         const alertBox = document.getElementById('alert-box');
@@ -409,12 +423,15 @@ Promise.all([
 
       showDesktopNotification(message, citiesInMessage, citiesData);
 
-      if(soundSelect.value!=="none"){
-        audio=new Audio(sounds[soundSelect.value]);
+      // סאונד בזמן אמת
+      const isMobile = window.innerWidth<=600;
+      if((isMobile && mobileSoundToggle.checked) || (!isMobile && soundSelectEl.value!=="none")){
+        const selected = soundSelectEl.value;
+        audio=new Audio(sounds[selected]);
         audio.loop=true;
         audio.play();
-        soundBtn.textContent="עצור";
-        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="בדוק"; },8000);
+        soundBtnEl.textContent="עצור";
+        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtnEl.textContent="בדוק"; },8000);
       }
 
       alertActive = true;
@@ -447,7 +464,7 @@ Promise.all([
     }
   });
 
-  // --- חיפוש ערים + הצעות ---
+  // חיפוש ערים + הצעות
   const searchInput = document.getElementById("city-search");
   const suggestionsBox = document.getElementById("city-suggestions");
   const selectedCitiesContainer = document.getElementById("selected-cities");
@@ -456,55 +473,47 @@ Promise.all([
     suggestionsBox.innerHTML = "";
     list.slice(0,8).forEach(c=>{
       const areaName = c.area && citiesData.areas[c.area] ? citiesData.areas[c.area].he : "";
-      const div = document.createElement("div");
+      const div=document.createElement("div");
       div.className="suggestion-item";
-      div.innerHTML = `<div class="suggestion-city">${c.he}</div>${areaName ? `<div class="suggestion-area">אזור ${areaName}</div>` : ""}`;
+      div.innerHTML=`<span class="suggestion-city">${c.he}</span> <small class="suggestion-area">${areaName}</small>`;
       div.addEventListener("click", ()=>{
-        if(selectedCities.length>=5){ alert("ניתן לבחור עד 5 ערים בלבד"); return; }
-        selectedCities.push(c.he);
-        renderSelectedCities(citiesData, citiesData.areas);
+        if(!selectedCities.includes(c.he)) selectedCities.push(c.he);
+        renderSelectedCities();
         searchInput.value="";
         suggestionsBox.innerHTML="";
       });
       suggestionsBox.appendChild(div);
     });
   }
-   
 
-  function renderSelectedCities(citiesData, areasData){
+  function renderSelectedCities(){
     selectedCitiesContainer.innerHTML="";
-    selectedCities.forEach(cityName=>{
-      const cityObj = Object.values(citiesData.cities).find(c => c.he === cityName);
-      const areaName = cityObj && areasData[cityObj.area] ? areasData[cityObj.area].he : "";
-      const div = document.createElement("div");
+    selectedCities.forEach(city=>{
+      const div=document.createElement("div");
       div.className="selected-city";
-      div.innerHTML = `<span class="remove">×</span><strong>${cityName}</strong>${areaName ? `<small>אזור ${areaName}</small>` : ""}`;
-      div.querySelector(".remove").onclick = ()=>{
-        selectedCities = selectedCities.filter(c=>c!==cityName);
-        renderSelectedCities(citiesData, areasData);
-      }
+      div.innerHTML=`<span class="remove" onclick="removeCity('${city}')">×</span><strong>${city}</strong>`;
       selectedCitiesContainer.appendChild(div);
     });
   }
 
   searchInput.addEventListener("input", ()=>{
-    const val = searchInput.value.trim();
-    if(val===""){ suggestionsBox.innerHTML=""; return; }
-    const filtered = Object.values(citiesData.cities).filter(c=>c.he.startsWith(val));
-    renderSuggestions(filtered);
+    const term = searchInput.value.trim();
+    if(!term){ suggestionsBox.innerHTML=""; return; }
+    const results = Object.values(citiesData.cities).filter(c=>c.he.includes(term));
+    renderSuggestions(results);
   });
 
-}).catch(err=>console.error('Error loading JSON files:', err));
+  window.removeCity=function(city){ selectedCities = selectedCities.filter(c=>c!==city); renderSelectedCities(); }
+});
 
 function fitMapToMarkersAndPolygons(){
   const bounds = new google.maps.LatLngBounds();
-  let hasAny = false;
-  markers.forEach(m=>{ bounds.extend(m.getPosition()); hasAny=true; });
-  activePolygons.forEach(p=>p.getPath().forEach(coord=>{ bounds.extend(coord); hasAny=true; }));
-  if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
+  markers.forEach(m=>bounds.extend(m.getPosition()));
+  activePolygons.forEach(p=>{
+    p.getPath().forEach(latlng=>bounds.extend(latlng));
+  });
+  if(!bounds.isEmpty()) map.fitBounds(bounds);
 }
-
-window.initMap = initMap;
 </script>
 </body>
 </html>

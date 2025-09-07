@@ -142,8 +142,10 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         right: 10px;
         max-width: 90%;
     }
-    #notifyPermission,
-    label[for="notifyPermission"] {
+    #sound-box label input#notifyPermission {
+        display: none;
+    }
+    #sound-box label:has(input#notifyPermission) {
         display: none;
     }
 }
@@ -444,8 +446,10 @@ Promise.all([
       div.className="suggestion-item";
       div.innerHTML = `<div class="suggestion-city">${c.he}</div>${areaName ? `<div class="suggestion-area">אזור ${areaName}</div>` : ""}`;
       ["click", "touchstart"].forEach(evt => {
-        div.addEventListener(evt, () => {
-            if(evt === "touchstart") e.preventDefault();
+        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+        const eventType = isMobile ? "touchstart" : "click";
+        div.addEventListener(eventType, (e) => {
+            if(eventType === "touchstart") e.preventDefault();
             if(selectedCities.length >= 5){
                 alert("ניתן לבחור עד 5 ערים בלבד");
                 return;

@@ -130,10 +130,8 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         bottom: 20px;
         max-height: 50vh;
     }
-    #sound-btn { 
-      
-        width: 100%;
-        margin-top: 8px;
+    #sound-select:not([value="none"]) + #sound-btn {
+        display: block !important;
     }
     .logo-overlay {
         top: 10px;
@@ -199,7 +197,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     <option value="homefront">פיקוד העורף</option>
     <option value="beep">צפצוף</option>
   </select>
-  <button id="sound-btn">בדוק</button>
+  <button id="sound-btn" style="display:none;">בדוק</button>
 
   <label style="margin-top:10px;cursor:pointer;">
     <input type="checkbox" id="notifyPermission"> אפשר קבלת התרעות בדפדפן
@@ -317,8 +315,6 @@ function addFlashingMarker(lat, lng, message) {
 const soundSelect = document.getElementById("sound-select");
 const soundBtn = document.getElementById("sound-btn");
 function updateSoundButton() { soundBtn.style.display = soundSelect.value==="none"?"none":"block"; soundBtn.textContent="בדוק"; }
-document.addEventListener("DOMContentLoaded", updateSoundButton);
-
 soundSelect.addEventListener("change", updateSoundButton);
 function toggleSound() {
   const selected = soundSelect.value;
@@ -506,4 +502,3 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-

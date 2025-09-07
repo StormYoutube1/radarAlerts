@@ -573,7 +573,7 @@ function fitMapToMarkersAndPolygons(){
   if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
 }
 
-window.initMap = initMap;
+
 db.ref("api_alerts").on("child_added", snapshot => {
   const apiData = snapshot.val();
   if (!apiData || !apiData.data) return;
@@ -636,7 +636,8 @@ function distanceKm([lat1, lon1], [lat2, lon2]) {
             Math.sin(dLon/2)**2;
   return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-
+window.initMap = initMap;
 </script>
 </body>
 </html>
+

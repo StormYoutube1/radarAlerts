@@ -578,16 +578,22 @@ db.ref("api_alerts").on("child_added", snapshot => {
   const apiData = snapshot.val();
   if (!apiData || !apiData.data) return;
 
+  // המרת שמות ערים לנקודות לפי cityCoordinates
+  const points = apiData.data
+      .map(cityName => cityCoordinates[cityName] ? [cityCoordinates[cityName].lat, cityCoordinates[cityName].lng] : null)
+      .filter(Boolean);
+
+  if(points.length === 0) return;
+
   // ניקוי פוליגונים קודמים
   activePolygons.forEach(p => p.setMap(null));
   activePolygons = [];
 
-  // בניית קבוצות פוליגונים (אם יש מרחקים גדולים)
-  const polygonsGroups = clusterPoints(apiData.data, 0.5); 
-  // 0.5 = סף מרחק בק"מ בין נקודות כדי להחליט אם שייכות לאותה קבוצה
+  // בניית קבוצות פוליגונים לפי מרחק
+  const polygonsGroups = clusterPoints(points, 0.5); // 0.5 ק"מ מרחק מקסימלי בין נקודות בקבוצה
 
   polygonsGroups.forEach(group => {
-    if (group.length >= 3) {
+    if (group.length >= 3) { // רק קבוצות עם לפחות 3 נקודות
       const path = group.map(([lat, lng]) => ({ lat, lng }));
       if (path[0].lat !== path[path.length-1].lat || path[0].lng !== path[path.length-1].lng) {
         path.push(path[0]); // לסגור את הפוליגון
@@ -609,35 +615,9 @@ db.ref("api_alerts").on("child_added", snapshot => {
   fitMapToMarkersAndPolygons();
 });
 
-// --- פונקציה פשוטה לקבץ נקודות לפי מרחק ---
-function clusterPoints(points, maxDistKm) {
-  const groups = [];
-  points.forEach(pt => {
-    let added = false;
-    for (const g of groups) {
-      if (g.some(p => distanceKm(p, pt) < maxDistKm)) {
-        g.push(pt);
-        added = true;
-        break;
-      }
-    }
-    if (!added) groups.push([pt]);
-  });
-  return groups;
-}
-
-// --- חישוב מרחק בק"מ בין שתי נקודות ---
-function distanceKm([lat1, lon1], [lat2, lon2]) {
-  const R = 6371;
-  const dLat = (lat2-lat1) * Math.PI/180;
-  const dLon = (lon2-lon1) * Math.PI/180;
-  const a = Math.sin(dLat/2)**2 +
-            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
-            Math.sin(dLon/2)**2;
-  return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
 window.initMap = initMap;
 </script>
 </body>
 </html>
+
 

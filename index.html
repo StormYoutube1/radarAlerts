@@ -130,9 +130,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         bottom: 20px;
         max-height: 50vh;
     }
-    #sound-select:not([value="none"]) + #sound-btn {
-        display: block !important;
-    }
     .logo-overlay {
         top: 10px;
         right: 10px;
@@ -314,7 +311,15 @@ function addFlashingMarker(lat, lng, message) {
 // --- סאונד ---
 const soundSelect = document.getElementById("sound-select");
 const soundBtn = document.getElementById("sound-btn");
-function updateSoundButton() { soundBtn.style.display = soundSelect.value==="none"?"none":"block"; soundBtn.textContent="בדוק"; }
+function updateSoundButton() {
+    const isMobile = window.matchMedia("(max-width: 600px)").matches;
+    if(soundSelect.value === "none") {
+        soundBtn.style.display = "none";
+    } else {
+        soundBtn.style.display = "block";
+        soundBtn.textContent = "בדוק";
+    }
+}
 soundSelect.addEventListener("change", updateSoundButton);
 updateSoundButton();
 function toggleSound() {

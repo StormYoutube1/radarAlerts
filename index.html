@@ -224,8 +224,14 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     if(isMobile){
         document.body.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;font-family:Arial,sans-serif;">
-                <h2>⚠️ האתר אינו זמין במכשירים ניידים</h2>
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; font-family:Arial,sans-serif; padding:20px; gap:12px;">
+                <h2 style="font-size:22px; line-height:1.3;">⚠️ האתר אינו זמין במכשירים ניידים</h2>
+                <p style="font-size:16px; line-height:1.4; max-width:300px;">לצערנו, חלק מהפונקציות לא תומכות במובייל.</p>
+                <p style="font-size:16px; line-height:1.4; max-width:300px;">אנא פתח את האתר במחשב כדי לראות אותו במלואו.</p>
+                <button onclick="window.location.href='platform.html'" 
+                        style="margin-top:10px; padding:12px 24px; font-size:16px; border:none; border-radius:8px; background:#333; color:white; cursor:pointer; max-width:250px; width:100%;">
+                        לפלטפורמות שלנו
+                </button>
             </div>
         `;
     }
@@ -564,7 +570,27 @@ Promise.all([
   });
 
 }).catch(err=>console.error('Error loading JSON files:', err));
-// --- פונקציה פשוטה לקבץ נקודות לפי מרחק ---
+
+function fitMapToMarkersAndPolygons(){
+  const bounds = new google.maps.LatLngBounds();
+  let hasAny = false;
+  markers.forEach(m=>{ bounds.extend(m.getPosition()); hasAny=true; });
+  activePolygons.forEach(p=>p.getPath().forEach(coord=>{ bounds.extend(coord); hasAny=true; }));
+  if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
+}
+
+
+// --- פונקציות עזר ---
+function distanceKm([lat1, lon1], [lat2, lon2]) {
+  const R = 6371; // רדיוס כדור הארץ בק"מ
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLon = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+            Math.sin(dLon/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
 function clusterPoints(points, maxDistKm) {
   const groups = [];
   points.forEach(pt => {
@@ -581,26 +607,16 @@ function clusterPoints(points, maxDistKm) {
   return groups;
 }
 
-// --- חישוב מרחק בק"מ בין שתי נקודות ---
-function distanceKm([lat1, lon1], [lat2, lon2]) {
-  const R = 6371;
-  const dLat = (lat2-lat1) * Math.PI/180;
-  const dLon = (lon2-lon1) * Math.PI/180;
-  const a = Math.sin(dLat/2)**2 +
-            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
-            Math.sin(dLon/2)**2;
-  return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
 function fitMapToMarkersAndPolygons(){
   const bounds = new google.maps.LatLngBounds();
   let hasAny = false;
   markers.forEach(m=>{ bounds.extend(m.getPosition()); hasAny=true; });
   activePolygons.forEach(p=>p.getPath().forEach(coord=>{ bounds.extend(coord); hasAny=true; }));
-  if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
+  if(hasAny) map.fitBounds(bounds);
+  else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
 }
 
-
+// --- מאזין ל-API_ALERTS (רק אחרי ש-cityCoordinates מוכנים) ---
 db.ref("api_alerts").on("child_added", snapshot => {
   const apiData = snapshot.val();
   if (!apiData || !apiData.data) return;
@@ -616,14 +632,15 @@ db.ref("api_alerts").on("child_added", snapshot => {
   activePolygons.forEach(p => p.setMap(null));
   activePolygons = [];
 
-  // בניית קבוצות פוליגונים לפי מרחק
-  const polygonsGroups = clusterPoints(points, 0.5); // 0.5 ק"מ מרחק מקסימלי בין נקודות בקבוצה
+  // בניית קבוצות פוליגונים לפי מרחק (0.5 ק"מ)
+  const polygonsGroups = clusterPoints(points, 0.5);
 
   polygonsGroups.forEach(group => {
     if (group.length >= 3) { // רק קבוצות עם לפחות 3 נקודות
       const path = group.map(([lat, lng]) => ({ lat, lng }));
+      // לסגור את הפוליגון אם לא סגור
       if (path[0].lat !== path[path.length-1].lat || path[0].lng !== path[path.length-1].lng) {
-        path.push(path[0]); // לסגור את הפוליגון
+        path.push(path[0]);
       }
       const polygon = new google.maps.Polygon({
         paths: path,
@@ -642,10 +659,10 @@ db.ref("api_alerts").on("child_added", snapshot => {
   fitMapToMarkersAndPolygons();
 });
 
+
 window.initMap = initMap;
 </script>
 </body>
 </html>
-
 
 

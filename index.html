@@ -403,8 +403,10 @@ Promise.all([
     if (showAlert && citiesInMessage.length > 0) {
 
       // --- עצירת התרעה קודמת אם קיימת ---
-      if(alertActive){
-        if(audio){ audio.pause(); audio=null; clearTimeout(audioTimeout); }
+      if(alertActive || audio){
+        if(audio){ audio.pause(); audio=null}
+        if(audioTimeout){ clearTimeout(audioTimeout); audioTimeout = null; }
+        if(audioTimeoutLocal){ clearTimeout(audioTimeoutLocal); audioTimeoutLocal = null; }
         const alertBox = document.getElementById('alert-box');
         alertBox.style.display='none';
         alertActive=false;

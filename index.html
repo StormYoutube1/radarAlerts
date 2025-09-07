@@ -417,7 +417,7 @@ Promise.all([
 
       showDesktopNotification(message, citiesInMessage, citiesData);
 
-      if(soundSelect.value!=="none"){
+      if(soundSelect.value !== "none" && enableSoundCheckbox.checked){
         audio=new Audio(sounds[soundSelect.value]);
         audio.loop=true;
         audio.play();

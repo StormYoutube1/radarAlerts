@@ -142,6 +142,10 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         right: 10px;
         max-width: 90%;
     }
+    #notifyPermission,
+    label[for="notifyPermission"] {
+        display: none;
+    }
 }
 @media (max-width: 900px) and (min-width: 601px) {
     #sound-box {
@@ -439,16 +443,23 @@ Promise.all([
       const div = document.createElement("div");
       div.className="suggestion-item";
       div.innerHTML = `<div class="suggestion-city">${c.he}</div>${areaName ? `<div class="suggestion-area">אזור ${areaName}</div>` : ""}`;
-      div.addEventListener("click", ()=>{
-        if(selectedCities.length>=5){ alert("ניתן לבחור עד 5 ערים בלבד"); return; }
-        selectedCities.push(c.he);
-        renderSelectedCities(citiesData, citiesData.areas);
-        searchInput.value="";
-        suggestionsBox.innerHTML="";
+      ["click", "touchstart"].forEach(evt => {
+        div.addEventListener(evt, () => {
+            if(evt === "touchstart") e.preventDefault();
+            if(selectedCities.length >= 5){
+                alert("ניתן לבחור עד 5 ערים בלבד");
+                return;
+            }
+            selectedCities.push(c.he);
+            renderSelectedCities(citiesData, citiesData.areas);
+            searchInput.value = "";
+            suggestionsBox.innerHTML = "";
+        });    
       });
       suggestionsBox.appendChild(div);
     });
-  }
+}
+      
 
   function renderSelectedCities(citiesData, areasData){
     selectedCitiesContainer.innerHTML="";
@@ -487,8 +498,3 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-
-
-
-
-

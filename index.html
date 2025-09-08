@@ -417,83 +417,7 @@ Promise.all([
   fetch('areas.json').then(res => res.json()),
   fetch('cleaned_fine.json').then(res => res.json())
 ]).then(([citiesData, areasData, polygonsData]) => {
-
-  Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
-  validAreas = areasData;
-  if(!map)initMap();
-  let activeInfoWindow = null;
-
-  Object.keys(polygonsData).forEach(city=>{
-    const pathCoords = polygonsData[city].map(coord=>({lat:coord[0], lng:coord[1]}));
-    const polygon = new google.maps.Polygon({ paths: pathCoords, strokeColor:'#000', strokeOpacity:1.0, strokeWeight:2, fillColor:'red', fillOpacity:0.4, map:null });
-    const infoWindow = new google.maps.InfoWindow({content: city});
-    polygon.addListener('click', e=>{
-      if(activeInfoWindow) activeInfoWindow.close();
-      infoWindow.setPosition(e.latLng); infoWindow.open(map); activeInfoWindow = infoWindow;
-    });
-    cityPolygons[city] = polygon;
-  });
-  // --- שמות רנדומליים לפונקציות ---
-function qwertyHullCluster(points) {
-    if(points.length<3) return points.slice();
-    // Jarvis march / gift wrapping simplified
-    let leftMost = points.reduce((prev,curr)=>curr.lng<prev.lng?curr:prev);
-    const hull = [];
-    let p = leftMost, q;
-    do {
-        hull.push(p);
-        q = points[0];
-        for(let r of points){
-            if(r===p) continue;
-            const cross = (q.lng-p.lng)*(r.lat-p.lat)-(q.lat-p.lat)*(r.lng-p.lng);
-            if(cross<0) q=r;
-        }
-        p=q;
-    } while(p!==leftMost);
-    return hull;
-}
-
-function asdfPolygonFlash(map, pathCoords) {
-    const poly = new google.maps.Polygon({
-        paths:pathCoords,
-        strokeColor:'#ff0000',
-        strokeOpacity:1.0,
-        strokeWeight:2,
-        fillColor:'#ff5555',
-        fillOpacity:0.4,
-        map:map
-    });
-    setTimeout(()=>poly.setMap(null),10000);
-    return poly;
-}
-
-function zxcvShowAlertClusters(citiesInMessage, cityCoordinates) {
-    // קבוצות של נקודות לפי מרחק (פשטות: אם מרחק > ~100km יוצר קבוצה נפרדת)
-    const clusters = [];
-    citiesInMessage.forEach(city=>{
-        const coords = cityCoordinates[city];
-        if(!coords) return;
-        let found=false;
-        for(let c of clusters){
-            if(c.some(pt=>Math.hypot(pt.lat-coords.lat, pt.lng-coords.lng)<1.0)){ // ~1.0° ~100km
-                c.push(coords);
-                found=true;
-                break;
-            }
-        }
-        if(!found) clusters.push([coords]);
-    });
-
-    clusters.forEach(cluster=>{
-        const hull = qwertyHullCluster(cluster);
-        asdfPolygonFlash(map,hull);
-    });
-
-    fitMapToMarkersAndPolygons(); // עדכון bounds
-}
-
-// --- מאזין לנתוני התרעות מ־API ---
-db.ref("api_alerts").on("child_added", snapshot => {
+  db.ref("api_alerts").on("child_added", snapshot => {
     const data = snapshot.val();
     if(!data||!data.text||!data.timestamp) return;
 
@@ -704,6 +628,82 @@ db.ref("api_alerts").on("child_added", snapshot => {
     renderSuggestions(filtered);
   });
 
+  Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
+  validAreas = areasData;
+  if(!map)initMap();
+  let activeInfoWindow = null;
+
+  Object.keys(polygonsData).forEach(city=>{
+    const pathCoords = polygonsData[city].map(coord=>({lat:coord[0], lng:coord[1]}));
+    const polygon = new google.maps.Polygon({ paths: pathCoords, strokeColor:'#000', strokeOpacity:1.0, strokeWeight:2, fillColor:'red', fillOpacity:0.4, map:null });
+    const infoWindow = new google.maps.InfoWindow({content: city});
+    polygon.addListener('click', e=>{
+      if(activeInfoWindow) activeInfoWindow.close();
+      infoWindow.setPosition(e.latLng); infoWindow.open(map); activeInfoWindow = infoWindow;
+    });
+    cityPolygons[city] = polygon;
+  });
+  // --- שמות רנדומליים לפונקציות ---
+function qwertyHullCluster(points) {
+    if(points.length<3) return points.slice();
+    // Jarvis march / gift wrapping simplified
+    let leftMost = points.reduce((prev,curr)=>curr.lng<prev.lng?curr:prev);
+    const hull = [];
+    let p = leftMost, q;
+    do {
+        hull.push(p);
+        q = points[0];
+        for(let r of points){
+            if(r===p) continue;
+            const cross = (q.lng-p.lng)*(r.lat-p.lat)-(q.lat-p.lat)*(r.lng-p.lng);
+            if(cross<0) q=r;
+        }
+        p=q;
+    } while(p!==leftMost);
+    return hull;
+}
+
+function asdfPolygonFlash(map, pathCoords) {
+    const poly = new google.maps.Polygon({
+        paths:pathCoords,
+        strokeColor:'#ff0000',
+        strokeOpacity:1.0,
+        strokeWeight:2,
+        fillColor:'#ff5555',
+        fillOpacity:0.4,
+        map:map
+    });
+    setTimeout(()=>poly.setMap(null),10000);
+    return poly;
+}
+
+function zxcvShowAlertClusters(citiesInMessage, cityCoordinates) {
+    // קבוצות של נקודות לפי מרחק (פשטות: אם מרחק > ~100km יוצר קבוצה נפרדת)
+    const clusters = [];
+    citiesInMessage.forEach(city=>{
+        const coords = cityCoordinates[city];
+        if(!coords) return;
+        let found=false;
+        for(let c of clusters){
+            if(c.some(pt=>Math.hypot(pt.lat-coords.lat, pt.lng-coords.lng)<1.0)){ // ~1.0° ~100km
+                c.push(coords);
+                found=true;
+                break;
+            }
+        }
+        if(!found) clusters.push([coords]);
+    });
+
+    clusters.forEach(cluster=>{
+        const hull = qwertyHullCluster(cluster);
+        asdfPolygonFlash(map,hull);
+    });
+
+    fitMapToMarkersAndPolygons(); // עדכון bounds
+}
+
+// --- מאזין לנתוני התרעות מ־API ---
+
 }).catch(err=>console.error('Error loading JSON files:', err));
 
 function fitMapToMarkersAndPolygons(){
@@ -718,4 +718,3 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-

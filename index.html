@@ -313,7 +313,7 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-let polygonsData = {};
+
 let map, cityCoordinates = {}, validAreas = [], markers = [], cityPolygons = {}, activePolygons = [], audio = null, audioTimeout = null, alertActive = false, alertTimeout = null;
 let desktopPermissionGranted = false;
 let selectedCities = [];
@@ -416,8 +416,7 @@ Promise.all([
   fetch('citiess.json').then(res => res.json()),
   fetch('areas.json').then(res => res.json()),
   fetch('cleaned_fine.json').then(res => res.json())
-]).then(([citiesData, areasData, polygonsJson]) => {
-  polygonsData = polygonsJson;
+]).then(([citiesData, areasData, polygonsData]) => {
 
   Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
   validAreas = areasData;
@@ -580,87 +579,9 @@ function fitMapToMarkersAndPolygons(){
   if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
 }
 
-db.ref("api_alerts").on("child_added", snapshot => {
-    const data = snapshot.val();
-    if(!data || !data.title || !data.data) return;
-    if(data.title !== "בדקות הקרובות צפויות להתקבל התרעות באיזורים הבאים:") return;
-
-    const citiesList = data.data; // רשימת שמות ערים
-    let polygonCoords = [];
-    let areasSet = new Set();
-
-    citiesList.forEach(cityName => {
-        const cityObj = polygonsData[cityName]; // מבוסס על cleaned_fine.json
-        if(cityObj && cityObj.length){
-            cityObj.forEach(coord => polygonCoords.push({lat: coord[0], lng: coord[1]}));
-        } else if(cityCoordinates[cityName]) {
-            polygonCoords.push(cityCoordinates[cityName]);
-        }
-
-        // הוספת שם האזור של העיר להודעה
-        const cityInfo = Object.values(citiesData.cities).find(c => c.he === cityName);
-        if(cityInfo && cityInfo.area) {
-            const areaName = citiesData.areas[cityInfo.area]?.he;
-            if(areaName) areasSet.add(areaName);
-        }
-    });
-
-    if(polygonCoords.length >= 3){
-        // --- convex hull ---
-        const hull = convexHull(polygonCoords);
-        hull.push(hull[0]);
-
-        const alertPolygon = new google.maps.Polygon({
-            paths: hull,
-            strokeColor: "#8000FFFF",
-            strokeOpacity: 1.0,
-            strokeWeight: 2,
-            fillColor: "red",
-            fillOpacity: 0.4,
-            map: map
-        });
-        activePolygons.push(alertPolygon);
-
-        // מתאם את המפה לנקודות הפוליגון
-        const bounds = new google.maps.LatLngBounds();
-        hull.forEach(c => bounds.extend(c));
-        map.fitBounds(bounds);
-
-        // --- יצירת הודעה להתרעה ---
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('he-IL', { day: "2-digit", month: "2-digit", year: "numeric" });
-        const timeStr = now.toLocaleTimeString('he-IL', { hour: "2-digit", minute: "2-digit" });
-
-        const areasList = Array.from(areasSet).sort((a,b)=>a.localeCompare(b,'he')).join(", ");
-
-        const messageText = `📡 | זוהו שיגורים לעבר ישראל\n\n${dateStr} - ${timeStr}\nבדקות הקרובות צפויות להתקבל התרעות באזורים הבאים:\n\n${areasList}\n\nרדאר 📡 - צבע אדום`;
-
-        // --- הצגת הודעה בדסקטופ ---
-        if(desktopPermissionGranted) {
-            const notification = new Notification("📡 | זוהו שיגורים לעבר ישראל", {
-                body: `אזורים: ${areasList}\n\n${dateStr} - ${timeStr}\n\nרדאר 📡 - צבע אדום`,
-                icon: 'cropped_circle_image.png'
-            });
-            notification.onclick = () => window.focus();
-        }
-
-        // --- הצגת ההודעה בקופסת התרעות ---
-        const alertBox = document.getElementById('alert-box');
-        alertBox.innerHTML = messageText.replace(/\n/g, "<br>");
-        alertBox.style.display = 'block';
-
-        // הסתרת ההתרעה אחרי 10 שניות
-        setTimeout(()=>{
-            alertPolygon.setMap(null);
-            activePolygons = activePolygons.filter(p => p !== alertPolygon);
-            alertBox.style.display = 'none';
-        }, 10000);
-    }
-});
-
-
 window.initMap = initMap;
 </script>
 </body>
 </html>
+
 

@@ -580,6 +580,33 @@ function fitMapToMarkersAndPolygons(){
   if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
 }
 
+// --- פונקציה לחישוב convex hull (Gift wrapping / Jarvis march) ---
+function convexHull(points) {
+    if(points.length < 3) return points.slice();
+
+    // מצא את הנקודה הכי שמאלית
+    let leftMost = 0;
+    for(let i=1; i<points.length; i++){
+        if(points[i].lng < points[leftMost].lng) leftMost = i;
+    }
+
+    const hull = [];
+    let p = leftMost;
+    do {
+        hull.push(points[p]);
+        let q = (p+1) % points.length;
+        for(let r=0; r<points.length; r++){
+            const cross = (points[q].lng - points[p].lng)*(points[r].lat - points[p].lat)
+                        - (points[r].lng - points[p].lng)*(points[q].lat - points[p].lat);
+            if(cross < 0) q = r; // נקודה שמאלה מהקו
+        }
+        p = q;
+    } while(p !== leftMost);
+
+    return hull;
+}
+
+// --- קבלת התרעות מה-API ---
 db.ref("api_alerts").on("child_added", snapshot => {
     const data = snapshot.val();
     if(!data || !data.title || !data.data) return;
@@ -597,15 +624,12 @@ db.ref("api_alerts").on("child_added", snapshot => {
         }
     });
 
-    // אם יש לפחות 3 נקודות, נבנה פוליגון
     if(polygonCoords.length >= 3){
-        // סוגרים את הפוליגון
-        if(polygonCoords[0] !== polygonCoords[polygonCoords.length - 1]){
-            polygonCoords.push(polygonCoords[0]);
-        }
+        const hull = convexHull(polygonCoords);
+        hull.push(hull[0]); // סוגרים את הפוליגון
 
         const alertPolygon = new google.maps.Polygon({
-            paths: polygonCoords,
+            paths: hull,
             strokeColor: "#8000FFFF",
             strokeOpacity: 1.0,
             strokeWeight: 2,
@@ -618,7 +642,7 @@ db.ref("api_alerts").on("child_added", snapshot => {
 
         // מתאם את המפה לנקודות הפוליגון
         const bounds = new google.maps.LatLngBounds();
-        polygonCoords.forEach(c => bounds.extend(c));
+        hull.forEach(c => bounds.extend(c));
         map.fitBounds(bounds);
 
         // מחיקת הפוליגון אחרי 10 שניות
@@ -633,4 +657,3 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-

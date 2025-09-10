@@ -314,11 +314,8 @@ async function initApp() {
     if (!keys) throw new Error("No KEYS found in DB!");
 
     // אתחול האפליקציה הסופי עם ה־config הנכון
-    if (firebase.apps.length > 0) {
-      firebase.app().delete(); // מוחק את האפליקציה הזמנית
-    }
-    firebase.initializeApp(keys.firebaseConfig); 
-    db = firebase.database();
+    const app = firebase.initializeApp(keys.firebaseConfig, "main");
+    db = app.database();
 
     // טעינת Google Maps
     const mapsScript = document.createElement("script");
@@ -326,7 +323,7 @@ async function initApp() {
     mapsScript.async = true;
     mapsScript.defer = true;
     document.head.appendChild(mapsScript);
-
+    await tempApp.delete();
   } catch(err) {
     console.error("Firebase init error:", err);
   }
@@ -601,4 +598,3 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-

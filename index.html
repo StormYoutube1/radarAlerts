@@ -297,31 +297,40 @@ renderDateTimeBox();
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-<script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCaGWR6n5uru3rd4sqtGNR-P-ZiYh5R7XI&language=he&callback=initMap">
-</script>
+
 
 <script>
-let db; // הגדרת db גלובלית
+let db;
+
 async function initApp() {
-  const tempConfig = { databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" };
-  firebase.initializeApp(tempConfig);
-  db = firebase.database(); 
   try {
-        const snapshot = await db.ref("KEYS").once("value");
+    // אתחול זמני רק כדי לקרוא KEYS
+    const tempConfig = { databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" };
+    const tempApp = firebase.initializeApp(tempConfig, "temp"); 
+    const tempDb = tempApp.database();
+
+    const snapshot = await tempDb.ref("KEYS").once("value");
     const keys = snapshot.val();
-    if(!keys) throw new Error("No KEYS found in DB!");
-    firebase.initializeApp(keys.firebaseConfig);
-    db = firebase.database(); // עדכון db עם config הסופי
+    if (!keys) throw new Error("No KEYS found in DB!");
+
+    // אתחול האפליקציה הסופי עם ה־config הנכון
+    if (firebase.apps.length > 0) {
+      firebase.app().delete(); // מוחק את האפליקציה הזמנית
+    }
+    firebase.initializeApp(keys.firebaseConfig); 
+    db = firebase.database();
+
+    // טעינת Google Maps
     const mapsScript = document.createElement("script");
     mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
     mapsScript.async = true;
     mapsScript.defer = true;
     document.head.appendChild(mapsScript);
-  } catch(err){ console.error(err); }
+
+  } catch(err) {
+    console.error("Firebase init error:", err);
+  }
 }
-
-
 
 let map, cityCoordinates = {}, validAreas = [], markers = [], cityPolygons = {}, activePolygons = [], audio = null, audioTimeout = null, alertActive = false, alertTimeout = null;
 let desktopPermissionGranted = false;
@@ -592,3 +601,4 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+

@@ -302,21 +302,22 @@ renderDateTimeBox();
 </script>
 
 <script>
+let db; // הגדרת db גלובלית
 async function initApp() {
   const tempConfig = { databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" };
   firebase.initializeApp(tempConfig);
-  const dbTemp = firebase.database();
+  db = firebase.database(); 
   try {
-        const snapshot = await dbTemp.ref("KEYS").once("value");
-        const keys = snapshot.val();
-        if(!keys) throw new Error("No KEYS found in DB!");
-        firebase.initializeApp(keys.firebaseConfig);
-        const db = firebase.database();
-        const mapsScript = document.createElement("script");
-        mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
-        mapsScript.async = true;
-        mapsScript.defer = true;
-        document.head.appendChild(mapsScript);
+        const snapshot = await db.ref("KEYS").once("value");
+    const keys = snapshot.val();
+    if(!keys) throw new Error("No KEYS found in DB!");
+    firebase.initializeApp(keys.firebaseConfig);
+    db = firebase.database(); // עדכון db עם config הסופי
+    const mapsScript = document.createElement("script");
+    mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
+    mapsScript.async = true;
+    mapsScript.defer = true;
+    document.head.appendChild(mapsScript);
   } catch(err){ console.error(err); }
 }
 

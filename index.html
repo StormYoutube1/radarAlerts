@@ -413,9 +413,9 @@ updateSoundButton();
 
 // --- טעינת JSONs ---
 Promise.all([
-  db.ref("cities").once("value").then(snapshot => snapshot.val()),
-  db.ref("areas").once("value").then(snapshot => snapshot.val()),
-  db.ref("polygons").once("value").then(snapshot => snapshot.val())
+  db.ref("citiesData").once("value").then(snapshot => snapshot.val()), 
+  db.ref("areasData").once("value").then(snapshot => snapshot.val()),
+  db.ref("cleanedFineData").once("value").then(snapshot => snapshot.val())
 ]).then(([citiesData, areasData, polygonsData]) => {
 
   Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
@@ -583,3 +583,4 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
+

@@ -302,17 +302,25 @@ renderDateTimeBox();
 </script>
 
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyCkrbB17xURNXcJuRv1s6gK2Es-nPXJTIo",
-  authDomain: "radar-7c02f.firebaseapp.com",
-  databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com",
-  projectId: "radar-7c02f",
-  storageBucket: "radar-7c02f.firebasestorage.app",
-  messagingSenderId: "985232578682",
-  appId: "1:985232578682:web:f9e4326411aced7c4583c3",
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+async function initApp() {
+  const tempConfig = { databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" };
+  firebase.initializeApp(tempConfig);
+  const dbTemp = firebase.database();
+  try {
+        const snapshot = await dbTemp.ref("KEYS").once("value");
+        const keys = snapshot.val();
+        if(!keys) throw new Error("No KEYS found in DB!");
+        firebase.initializeApp(keys.firebaseConfig);
+        const db = firebase.database();
+        const mapsScript = document.createElement("script");
+        mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
+        mapsScript.async = true;
+        mapsScript.defer = true;
+        document.head.appendChild(mapsScript);
+  } catch(err){ console.error(err); }
+}
+
+
 
 let map, cityCoordinates = {}, validAreas = [], markers = [], cityPolygons = {}, activePolygons = [], audio = null, audioTimeout = null, alertActive = false, alertTimeout = null;
 let desktopPermissionGranted = false;
@@ -583,4 +591,3 @@ window.initMap = initMap;
 </script>
 </body>
 </html>
-

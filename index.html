@@ -63,7 +63,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 #sound-box .section-title {
   font-weight: bold;
   font-size: 15px;
-  color: #ff0000; /* אדום במקום צהוב */
+  color: #ff0000;
   margin-bottom: 6px;
   border-bottom: 1px solid #444;
   padding-bottom: 3px;
@@ -291,44 +291,27 @@ function renderDateTimeBox() {
 setInterval(renderDateTimeBox, 1000);
 renderDateTimeBox();
 </script>
-</body>
-</html>
-
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-
 <script>
-let db;
-
 async function initApp() {
+  const tempConfig = { databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" };
+  firebase.initializeApp(tempConfig);
+  const dbTemp = firebase.database();
   try {
-    // אתחול זמני רק כדי לקרוא KEYS
-    const tempConfig = { databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" };
-    const tempApp = firebase.initializeApp(tempConfig, "temp"); 
-    const tempDb = tempApp.database();
-
-    const snapshot = await tempDb.ref("KEYS").once("value");
-    const keys = snapshot.val();
-    if (!keys) throw new Error("No KEYS found in DB!");
-
-    // אתחול האפליקציה הסופי עם ה־config הנכון
-    const app = firebase.initializeApp(keys.firebaseConfig, "main");
-    db = app.database();
-
-    // טעינת Google Maps
-    const mapsScript = document.createElement("script");
-    mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
-    mapsScript.async = true;
-    mapsScript.defer = true;
-    document.head.appendChild(mapsScript);
-    await tempApp.delete();
-  } catch(err) {
-    console.error("Firebase init error:", err);
-  }
-}
-
+        const snapshot = await dbTemp.ref("KEYS").once("value");
+        const keys = snapshot.val();
+        if(!keys) throw new Error("No KEYS found in DB!");
+        firebase.initializeApp(keys.firebaseConfig);
+        const db = firebase.database();
+        const mapsScript = document.createElement("script");
+        mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
+        mapsScript.async = true;
+        mapsScript.defer = true;
+        document.head.appendChild(mapsScript);
+    
 let map, cityCoordinates = {}, validAreas = [], markers = [], cityPolygons = {}, activePolygons = [], audio = null, audioTimeout = null, alertActive = false, alertTimeout = null;
 let desktopPermissionGranted = false;
 let selectedCities = [];
@@ -383,14 +366,7 @@ function showDesktopNotification(message, citiesInMessage, citiesData) {
 }
 
 // --- מפה ---
-function initMap() {
-  map = new google.maps.Map(document.getElementById('map'), {
-    center: {lat: 31.5, lng: 34.8},
-    zoom: 7,
-    mapTypeId: 'roadmap',
-    disableDefaultUI: true
-  });
-}
+
 
 // --- פלאש מרקרים ---
 function addFlashingMarker(lat, lng, message) {
@@ -428,9 +404,9 @@ updateSoundButton();
 
 // --- טעינת JSONs ---
 Promise.all([
-  db.ref("citiesData").once("value").then(snapshot => snapshot.val()), 
-  db.ref("areasData").once("value").then(snapshot => snapshot.val()),
-  db.ref("cleanedFineData").once("value").then(snapshot => snapshot.val())
+  db.ref("cities").once("value").then(snapshot => snapshot.val()),
+  db.ref("areas").once("value").then(snapshot => snapshot.val()),
+  db.ref("polygons").once("value").then(snapshot => snapshot.val())
 ]).then(([citiesData, areasData, polygonsData]) => {
 
   Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
@@ -593,7 +569,18 @@ function fitMapToMarkersAndPolygons(){
   activePolygons.forEach(p=>p.getPath().forEach(coord=>{ bounds.extend(coord); hasAny=true; }));
   if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
 }
-
+} catch(err) {
+    console.error("Error initializing app:", err);
+  }
+}
+function initMap() {
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: {lat: 31.5, lng: 34.8},
+    zoom: 7,
+    mapTypeId: 'roadmap',
+    disableDefaultUI: true
+  });
+}
 window.initMap = initMap;
 </script>
 </body>

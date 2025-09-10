@@ -296,6 +296,15 @@ renderDateTimeBox();
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
 <script>
+let map;
+function initMap() {
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: {lat: 31.5, lng: 34.8},
+    zoom: 7,
+    mapTypeId: 'roadmap',
+    disableDefaultUI: true
+  });
+}
 async function initApp() {
   const tempConfig = { databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" };
   firebase.initializeApp(tempConfig);
@@ -573,14 +582,7 @@ function fitMapToMarkersAndPolygons(){
     console.error("Error initializing app:", err);
   }
 }
-function initMap() {
-  map = new google.maps.Map(document.getElementById('map'), {
-    center: {lat: 31.5, lng: 34.8},
-    zoom: 7,
-    mapTypeId: 'roadmap',
-    disableDefaultUI: true
-  });
-}
+
 window.initMap = initMap;
 </script>
 </body>

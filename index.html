@@ -154,7 +154,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
         display: none !important;
     }
 
-    
     #sound-box {
         width: 90%;
         right: 50%;
@@ -237,6 +236,7 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
     }
 })();
 </script>
+
 <div id="map"></div>
 <div class="logo-overlay"><img src="cropped_circle_image.png" alt="Logo"></div>
 <div id="alert-box" class="info-box"></div>
@@ -296,294 +296,269 @@ renderDateTimeBox();
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
 <script>
-let map;
-function initMap() {
-  map = new google.maps.Map(document.getElementById('map'), {
-    center: {lat: 31.5, lng: 34.8},
-    zoom: 7,
-    mapTypeId: 'roadmap',
-    disableDefaultUI: true
-  });
-}
 async function initApp() {
   const tempConfig = { databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" };
   firebase.initializeApp(tempConfig);
   const dbTemp = firebase.database();
   try {
-        const snapshot = await dbTemp.ref("KEYS").once("value");
-        const keys = snapshot.val();
-        if(!keys) throw new Error("No KEYS found in DB!");
-        firebase.initializeApp(keys.firebaseConfig);
-        const db = firebase.database();
-        const mapsScript = document.createElement("script");
-        mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
-        mapsScript.async = true;
-        mapsScript.defer = true;
-        document.head.appendChild(mapsScript);
-    
-let map, cityCoordinates = {}, validAreas = [], markers = [], cityPolygons = {}, activePolygons = [], audio = null, audioTimeout = null, alertActive = false, alertTimeout = null;
-let desktopPermissionGranted = false;
-let selectedCities = [];
+      const snapshot = await dbTemp.ref("KEYS").once("value");
+      const keys = snapshot.val();
+      if(!keys) throw new Error("No KEYS found in DB!");
+      firebase.initializeApp(keys.firebaseConfig);
+      const db = firebase.database();
 
-const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3", alert: "siren.mp3", beep: "beep.wav" };
+      const mapsScript = document.createElement("script");
+      mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
+      mapsScript.async = true;
+      mapsScript.defer = true;
+      document.head.appendChild(mapsScript);
 
-// --- הרשאת התראות ---
-const notifyCheckbox = document.getElementById("notifyPermission");
-function updateNotifyCheckbox() {
-  desktopPermissionGranted = Notification.permission === "granted";
-  notifyCheckbox.checked = false;
-  notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
-}
-notifyCheckbox.addEventListener("change", function() {
-  if (this.checked && "Notification" in window) {
-    Notification.requestPermission().then(permission => {
-      desktopPermissionGranted = permission === "granted";
-      if (!desktopPermissionGranted) this.checked = false;
-    });
-  } else {
-    desktopPermissionGranted = false;
-  }
-});
-updateNotifyCheckbox();
+      let map, cityCoordinates = {}, validAreas = [], markers = [], cityPolygons = {}, activePolygons = [], audio = null, audioTimeout = null, alertActive = false;
+      let desktopPermissionGranted = false;
+      let selectedCities = [];
 
-// --- הצגת התראה בדסקטופ ---
-function showDesktopNotification(message, citiesInMessage, citiesData) {
-  if (!desktopPermissionGranted) return;
+      const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3", alert: "siren.mp3", beep: "beep.wav" };
 
-  const firstLine = message.split("\n").find(l => l.trim() !== "");
-  const title = firstLine || "🚨 התרעה";
-
-  const areasSet = new Set();
-  citiesInMessage.forEach(city => {
-    const cityObj = Object.values(citiesData.cities).find(c => c.he === city);
-    if (cityObj && cityObj.area) {
-      const areaId = cityObj.area;
-      const areaName = citiesData.areas[areaId]?.he;
-      if (areaName) areasSet.add(areaName);
-    }
-  });
-  const areasList = Array.from(areasSet).sort((a,b)=> a.localeCompare(b, 'he')).join(", ");
-
-  const now = new Date();
-  const options = { timeZone: 'Asia/Jerusalem', hour12:false };
-  const dateTimeStr = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
-
-  const body = `${areasList}\n\n${dateTimeStr}\n\nרדאר 📡 - צבע אדום`;
-
-  const notification = new Notification(title, { body: body, icon: 'cropped_circle_image.png' });
-  notification.onclick = () => window.focus();
-}
-
-// --- מפה ---
-
-
-// --- פלאש מרקרים ---
-function addFlashingMarker(lat, lng, message) {
-  const marker = new google.maps.Marker({position: {lat, lng}, map, title: message});
-  markers.push(marker);
-  let visible = true;
-  const flashInterval = setInterval(() => { marker.setVisible(visible); visible = !visible; }, 600);
-  setTimeout(() => { marker.setMap(null); clearInterval(flashInterval); markers = markers.filter(m => m!==marker); }, 10000);
-}
-
-// --- סאונד ---
-const enableSoundCheckbox = document.getElementById("enable-sound");
-const soundSelect = document.getElementById("sound-select");
-const soundBtn = document.getElementById("sound-btn");
-let audioTimeoutLocal = null;
-
-// כפתור "בדוק" מתחיל/עוצר
-function toggleSound() {
-  const selected = soundSelect.value;
-  if(!selected || !enableSoundCheckbox.checked) return;
-
-  if(audio){ 
-    audio.pause(); audio=null; clearTimeout(audioTimeoutLocal); soundBtn.textContent="▶"; 
-  } else { 
-    audio=new Audio(sounds[selected]); audio.loop=true; audio.play(); soundBtn.textContent="⏸";
-    audioTimeoutLocal=setTimeout(()=>{ if(audio){ audio.pause(); audio=null; soundBtn.textContent="▶"; } },8000);
-  }
-}
-soundBtn.addEventListener("click", toggleSound);
-function updateSoundButton() { soundBtn.style.display = soundSelect.value ? "block" : "none"; soundBtn.textContent="▶"; }
-soundSelect.addEventListener("change", updateSoundButton);
-updateSoundButton();
-
-
-
-// --- טעינת JSONs ---
-Promise.all([
-  db.ref("cities").once("value").then(snapshot => snapshot.val()),
-  db.ref("areas").once("value").then(snapshot => snapshot.val()),
-  db.ref("polygons").once("value").then(snapshot => snapshot.val())
-]).then(([citiesData, areasData, polygonsData]) => {
-
-  Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
-  validAreas = areasData;
-  if(!map)initMap();
-  let activeInfoWindow = null;
-
-  Object.keys(polygonsData).forEach(city=>{
-    const pathCoords = polygonsData[city].map(coord=>({lat:coord[0], lng:coord[1]}));
-    const polygon = new google.maps.Polygon({ paths: pathCoords, strokeColor:'#000', strokeOpacity:1.0, strokeWeight:2, fillColor:'red', fillOpacity:0.4, map:null });
-    const infoWindow = new google.maps.InfoWindow({content: city});
-    polygon.addListener('click', e=>{
-      if(activeInfoWindow) activeInfoWindow.close();
-      infoWindow.setPosition(e.latLng); infoWindow.open(map); activeInfoWindow = infoWindow;
-    });
-    cityPolygons[city] = polygon;
-  });
-
-  db.ref("messages").on("child_added", snapshot=>{
-    const data=snapshot.val();
-    if(!data||!data.text||!data.timestamp) return;
-    const msgTime=new Date(data.timestamp); if(new Date()-msgTime>60000) return;
-
-    const message = data.text;
-    let settlements = new Set();
-
-    message.split("\n").forEach(line=>{
-      if(line.startsWith("•")){
-        let parts=line.split(":");
-        if(parts.length>1){
-          parts[1].split(",").forEach(city=>{
-            let cleanCity=city.replace(/\(.*?\)/g,"").trim();
-            if(validAreas.includes(cleanCity)) settlements.add(cleanCity);
+      // --- הרשאת התראות ---
+      const notifyCheckbox = document.getElementById("notifyPermission");
+      function updateNotifyCheckbox() {
+        desktopPermissionGranted = Notification.permission === "granted";
+        notifyCheckbox.checked = false;
+        notifyCheckbox.disabled = Notification.permission !== "default" && Notification.permission !== "granted";
+      }
+      notifyCheckbox.addEventListener("change", function() {
+        if (this.checked && "Notification" in window) {
+          Notification.requestPermission().then(permission => {
+            desktopPermissionGranted = permission === "granted";
+            if (!desktopPermissionGranted) this.checked = false;
           });
+        } else { desktopPermissionGranted = false; }
+      });
+      updateNotifyCheckbox();
+
+      function showDesktopNotification(message, citiesInMessage, citiesData) {
+        if (!desktopPermissionGranted) return;
+        const firstLine = message.split("\n").find(l => l.trim() !== "");
+        const title = firstLine || "🚨 התרעה";
+        const areasSet = new Set();
+        citiesInMessage.forEach(city => {
+          const cityObj = Object.values(citiesData.cities).find(c => c.he === city);
+          if (cityObj && cityObj.area) {
+            const areaId = cityObj.area;
+            const areaName = citiesData.areas[areaId]?.he;
+            if (areaName) areasSet.add(areaName);
+          }
+        });
+        const areasList = Array.from(areasSet).sort((a,b)=> a.localeCompare(b, 'he')).join(", ");
+        const now = new Date();
+        const options = { timeZone: 'Asia/Jerusalem', hour12:false };
+        const dateTimeStr = `${now.toLocaleDateString('he-IL', options)} - ${now.toLocaleTimeString('he-IL', options)}`;
+        const body = `${areasList}\n\n${dateTimeStr}\n\nרדאר 📡 - צבע אדום`;
+        const notification = new Notification(title, { body: body, icon: 'cropped_circle_image.png' });
+        notification.onclick = () => window.focus();
+      }
+
+      // --- מפה ---
+      window.initMap = function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+          center: {lat: 31.5, lng: 34.8},
+          zoom: 7,
+          mapTypeId: 'roadmap',
+          disableDefaultUI: true
+        });
+      }
+
+      function addFlashingMarker(lat, lng, message) {
+        const marker = new google.maps.Marker({position: {lat, lng}, map, title: message});
+        markers.push(marker);
+        let visible = true;
+        const flashInterval = setInterval(() => { marker.setVisible(visible); visible = !visible; }, 600);
+        setTimeout(() => { marker.setMap(null); clearInterval(flashInterval); markers = markers.filter(m => m!==marker); }, 10000);
+      }
+
+      // --- סאונד ---
+      const enableSoundCheckbox = document.getElementById("enable-sound");
+      const soundSelect = document.getElementById("sound-select");
+      const soundBtn = document.getElementById("sound-btn");
+      let audioTimeoutLocal = null;
+      function toggleSound() {
+        const selected = soundSelect.value;
+        if(!selected || !enableSoundCheckbox.checked) return;
+        if(audio){ 
+          audio.pause(); audio=null; clearTimeout(audioTimeoutLocal); soundBtn.textContent="▶"; 
+        } else { 
+          audio=new Audio(sounds[selected]); audio.loop=true; audio.play(); soundBtn.textContent="⏸";
+          audioTimeoutLocal=setTimeout(()=>{ if(audio){ audio.pause(); audio=null; soundBtn.textContent="▶"; } },8000);
         }
       }
-    });
+      soundBtn.addEventListener("click", toggleSound);
+      function updateSoundButton() { soundBtn.style.display = soundSelect.value ? "block" : "none"; soundBtn.textContent="▶"; }
+      soundSelect.addEventListener("change", updateSoundButton);
+      updateSoundButton();
 
-    const citiesInMessage = Array.from(settlements);
+      // --- טעינת JSONs ---
+      Promise.all([
+        db.ref("citiesData").once("value").then(snapshot => snapshot.val()), 
+        db.ref("areasData").once("value").then(snapshot => snapshot.val()),
+        db.ref("cleanedFineData").once("value").then(snapshot => snapshot.val())
+      ]).then(([citiesData, areasData, polygonsData]) => {
 
-    let showAlert = false;
-    if (selectedCities.length === 0) {
-      showAlert = true;
-    } else {
-      showAlert = citiesInMessage.some(city => selectedCities.includes(city));
-    }
+        Object.values(citiesData.cities).forEach(c => { cityCoordinates[c.he]={lat:c.lat,lng:c.lng}; });
+        validAreas = areasData;
+        if(!map)initMap();
+        let activeInfoWindow = null;
 
-    if (showAlert && citiesInMessage.length > 0) {
+        Object.keys(polygonsData).forEach(city=>{
+          const pathCoords = polygonsData[city].map(coord=>({lat:coord[0], lng:coord[1]}));
+          const polygon = new google.maps.Polygon({ paths: pathCoords, strokeColor:'#000', strokeOpacity:1.0, strokeWeight:2, fillColor:'red', fillOpacity:0.4, map:null });
+          const infoWindow = new google.maps.InfoWindow({content: city});
+          polygon.addListener('click', e=>{
+            if(activeInfoWindow) activeInfoWindow.close();
+            infoWindow.setPosition(e.latLng); infoWindow.open(map); activeInfoWindow = infoWindow;
+          });
+          cityPolygons[city] = polygon;
+        });
 
-      // --- עצירת התרעה קודמת אם קיימת ---
-      if(alertActive || audio){
-        if(audio){ audio.pause(); audio=null}
-        if(audioTimeout){ clearTimeout(audioTimeout); audioTimeout = null; }
-        if(audioTimeoutLocal){ clearTimeout(audioTimeoutLocal); audioTimeoutLocal = null; }
-        const alertBox = document.getElementById('alert-box');
-        alertBox.style.display='none';
-        alertActive=false;
-        markers.forEach(m=>m.setMap(null));
-        markers=[];
-        activePolygons.forEach(p=>p.setMap(null));
-        activePolygons=[];
-        clearTimeout(alertTimeout);
+        db.ref("messages").on("child_added", snapshot=>{
+          const data=snapshot.val();
+          if(!data||!data.text||!data.timestamp) return;
+          const msgTime=new Date(data.timestamp); if(new Date()-msgTime>60000) return;
+          const message = data.text;
+          let settlements = new Set();
+          message.split("\n").forEach(line=>{
+            if(line.startsWith("•")){
+              let parts=line.split(":");
+              if(parts.length>1){
+                parts[1].split(",").forEach(city=>{
+                  let cleanCity=city.replace(/\(.*?\)/g,"").trim();
+                  if(validAreas.includes(cleanCity)) settlements.add(cleanCity);
+                });
+              }
+            }
+          });
+          const citiesInMessage = Array.from(settlements);
+          let showAlert = selectedCities.length === 0 ? true : citiesInMessage.some(city => selectedCities.includes(city));
+
+          if (showAlert && citiesInMessage.length > 0) {
+            if(alertActive || audio){
+              if(audio){ audio.pause(); audio=null}
+              if(audioTimeout){ clearTimeout(audioTimeout); audioTimeout = null; }
+              if(audioTimeoutLocal){ clearTimeout(audioTimeoutLocal); audioTimeoutLocal = null; }
+              const alertBox = document.getElementById('alert-box');
+              alertBox.style.display='none';
+              alertActive=false;
+              markers.forEach(m=>m.setMap(null));
+              markers=[];
+              activePolygons.forEach(p=>p.setMap(null));
+              activePolygons=[];
+              clearTimeout(alertTimeout);
+            }
+
+            showDesktopNotification(message, citiesInMessage, citiesData);
+
+            if(soundSelect.value !== "none" && enableSoundCheckbox.checked){
+              audio=new Audio(sounds[soundSelect.value]);
+              audio.loop=true;
+              audio.play();
+              soundBtn.textContent="⏸";
+              audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="▶"; },8000);
+            }
+
+            alertActive = true;
+            const alertBox = document.getElementById('alert-box');
+            alertBox.innerHTML = message.replace(/\n/g,"<br>");
+            alertBox.style.display='block';
+            const soundBox = document.getElementById('sound-box');
+            soundBox.style.display = 'none';
+            alertTimeout = setTimeout(()=>{
+              alertBox.style.display='none';
+              alertActive=false;
+              soundBox.style.display = 'flex';
+            },10000);
+
+            let currentPolygons = [];
+            citiesInMessage.forEach(city=>{
+              if(cityPolygons[city]){ cityPolygons[city].setMap(map); currentPolygons.push(cityPolygons[city]); }
+              const coords = cityCoordinates[city];
+              if(coords) addFlashingMarker(coords.lat, coords.lng, message);
+            });
+            activePolygons.push(...currentPolygons);
+            fitMapToMarkersAndPolygons();
+
+            setTimeout(()=>{
+              markers.forEach(m=>m.setMap(null));
+              markers=[];
+              currentPolygons.forEach(p=>p.setMap(null));
+              activePolygons=activePolygons.filter(p=>!currentPolygons.includes(p));
+              fitMapToMarkersAndPolygons();
+            },10000);
+          }
+        });
+
+        // --- חיפוש ערים + הצעות ---
+        const searchInput = document.getElementById("city-search");
+        const suggestionsBox = document.getElementById("city-suggestions");
+        const selectedCitiesContainer = document.getElementById("selected-cities");
+
+        function renderSuggestions(list){
+          suggestionsBox.innerHTML = "";
+          list.slice(0,8).forEach(c=>{
+            const areaName = c.area && citiesData.areas[c.area] ? citiesData.areas[c.area].he : "";
+            const div = document.createElement("div");
+            div.className="suggestion-item";
+            div.innerHTML = `<div class="suggestion-city">${c.he}</div>${areaName ? `<div class="suggestion-area">אזור ${areaName}</div>` : ""}`;
+            div.addEventListener("click", ()=>{
+              if(selectedCities.length>=5){ alert("ניתן לבחור עד 5 ערים בלבד"); return; }
+              selectedCities.push(c.he);
+              renderSelectedCities(citiesData, citiesData.areas);
+              searchInput.value="";
+              suggestionsBox.innerHTML="";
+            });
+            suggestionsBox.appendChild(div);
+          });
+        }
+
+        function renderSelectedCities(citiesData, areasData){
+          selectedCitiesContainer.innerHTML="";
+          selectedCities.forEach(cityName=>{
+            const cityObj = Object.values(citiesData.cities).find(c => c.he === cityName);
+            const areaName = cityObj && areasData[cityObj.area] ? areasData[cityObj.area].he : "";
+            const div = document.createElement("div");
+            div.className="selected-city";
+            div.innerHTML = `<span class="remove">×</span><strong>${cityName}</strong>${areaName ? `<small>אזור ${areaName}</small>` : ""}`;
+            div.querySelector(".remove").onclick = ()=>{
+              selectedCities = selectedCities.filter(c=>c!==cityName);
+              renderSelectedCities(citiesData, areasData);
+            }
+            selectedCitiesContainer.appendChild(div);
+          });
+        }
+
+        searchInput.addEventListener("input", ()=>{
+          const val = searchInput.value.trim();
+          if(val===""){ suggestionsBox.innerHTML=""; return; }
+          const filtered = Object.values(citiesData.cities).filter(c=>c.he.startsWith(val));
+          renderSuggestions(filtered);
+        });
+
+      }).catch(err=>console.error('Error loading JSON files:', err));
+
+      function fitMapToMarkersAndPolygons(){
+        const bounds = new google.maps.LatLngBounds();
+        let hasAny = false;
+        markers.forEach(m=>{ bounds.extend(m.getPosition()); hasAny=true; });
+        activePolygons.forEach(p=>p.getPath().forEach(coord=>{ bounds.extend(coord); hasAny=true; }));
+        if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
       }
 
-      showDesktopNotification(message, citiesInMessage, citiesData);
-
-      if(soundSelect.value !== "none" && enableSoundCheckbox.checked){
-        audio=new Audio(sounds[soundSelect.value]);
-        audio.loop=true;
-        audio.play();
-        soundBtn.textContent="⏸";
-        audioTimeout=setTimeout(()=>{ audio.pause(); audio=null; soundBtn.textContent="▶"; },8000);
-      }
-
-      alertActive = true;
-      const alertBox = document.getElementById('alert-box');
-      alertBox.innerHTML = message.replace(/\n/g,"<br>");
-      alertBox.style.display='block';
-      const soundBox = document.getElementById('sound-box');
-      soundBox.style.display = 'none';
-      alertTimeout = setTimeout(()=>{
-        alertBox.style.display='none';
-        alertActive=false;
-        soundBox.style.display = 'flex';
-      },10000);
-
-      let currentPolygons = [];
-      citiesInMessage.forEach(city=>{
-        if(cityPolygons[city]){ cityPolygons[city].setMap(map); currentPolygons.push(cityPolygons[city]); }
-        const coords = cityCoordinates[city];
-        if(coords) addFlashingMarker(coords.lat, coords.lng, message);
-      });
-
-      activePolygons.push(...currentPolygons);
-      fitMapToMarkersAndPolygons();
-
-      setTimeout(()=>{
-        markers.forEach(m=>m.setMap(null));
-        markers=[];
-        currentPolygons.forEach(p=>p.setMap(null));
-        activePolygons=activePolygons.filter(p=>!currentPolygons.includes(p));
-        fitMapToMarkersAndPolygons();
-      },10000);
-    }
-  });
-
-  // --- חיפוש ערים + הצעות ---
-  const searchInput = document.getElementById("city-search");
-  const suggestionsBox = document.getElementById("city-suggestions");
-  const selectedCitiesContainer = document.getElementById("selected-cities");
-
-  function renderSuggestions(list){
-    suggestionsBox.innerHTML = "";
-    list.slice(0,8).forEach(c=>{
-      const areaName = c.area && citiesData.areas[c.area] ? citiesData.areas[c.area].he : "";
-      const div = document.createElement("div");
-      div.className="suggestion-item";
-      div.innerHTML = `<div class="suggestion-city">${c.he}</div>${areaName ? `<div class="suggestion-area">אזור ${areaName}</div>` : ""}`;
-      div.addEventListener("click", ()=>{
-        if(selectedCities.length>=5){ alert("ניתן לבחור עד 5 ערים בלבד"); return; }
-        selectedCities.push(c.he);
-        renderSelectedCities(citiesData, citiesData.areas);
-        searchInput.value="";
-        suggestionsBox.innerHTML="";
-      });
-      suggestionsBox.appendChild(div);
-    });
+  } catch(err) {
+      console.error("Error initializing app:", err);
   }
-   
-
-  function renderSelectedCities(citiesData, areasData){
-    selectedCitiesContainer.innerHTML="";
-    selectedCities.forEach(cityName=>{
-      const cityObj = Object.values(citiesData.cities).find(c => c.he === cityName);
-      const areaName = cityObj && areasData[cityObj.area] ? areasData[cityObj.area].he : "";
-      const div = document.createElement("div");
-      div.className="selected-city";
-      div.innerHTML = `<span class="remove">×</span><strong>${cityName}</strong>${areaName ? `<small>אזור ${areaName}</small>` : ""}`;
-      div.querySelector(".remove").onclick = ()=>{
-        selectedCities = selectedCities.filter(c=>c!==cityName);
-        renderSelectedCities(citiesData, areasData);
-      }
-      selectedCitiesContainer.appendChild(div);
-    });
-  }
-
-  searchInput.addEventListener("input", ()=>{
-    const val = searchInput.value.trim();
-    if(val===""){ suggestionsBox.innerHTML=""; return; }
-    const filtered = Object.values(citiesData.cities).filter(c=>c.he.startsWith(val));
-    renderSuggestions(filtered);
-  });
-
-}).catch(err=>console.error('Error loading JSON files:', err));
-
-function fitMapToMarkersAndPolygons(){
-  const bounds = new google.maps.LatLngBounds();
-  let hasAny = false;
-  markers.forEach(m=>{ bounds.extend(m.getPosition()); hasAny=true; });
-  activePolygons.forEach(p=>p.getPath().forEach(coord=>{ bounds.extend(coord); hasAny=true; }));
-  if(hasAny) map.fitBounds(bounds); else { map.setCenter({lat:31.5,lng:34.8}); map.setZoom(7); }
 }
-} catch(err) {
-    console.error("Error initializing app:", err);
-  }
-}
 
-window.initMap = initMap;
+window.initApp = initApp;
+initApp();
 </script>
+
 </body>
 </html>

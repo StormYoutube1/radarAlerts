@@ -39,7 +39,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 }
 .logo-overlay img { width: 100%; height: 100%; object-fit: cover; }
 
-/* --- תיבת ההגדרות --- */
 #sound-box {
   position: absolute;
   top: 20px;
@@ -59,7 +58,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   font-size: 14px;
 }
 
-/* כותרות קטגוריה */
 #sound-box .section-title {
   font-weight: bold;
   font-size: 15px;
@@ -69,7 +67,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   padding-bottom: 3px;
 }
 
-/* שדות וטפסים */
 #sound-box label, 
 #sound-box select, 
 #sound-box button, 
@@ -99,7 +96,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   color: white;
 }
 
-/* ערים נבחרות */
 #selected-cities {
   display: flex;
   flex-direction: column;
@@ -125,7 +121,6 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
   float: left;
 }
 
-/* הצעות חיפוש */
 #city-suggestions {
   background: rgba(34,34,34,0.95);
   border-radius: 8px;
@@ -146,14 +141,13 @@ html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; direction:
 .suggestion-city { font-weight: bold; }
 .suggestion-area { font-size: 12px; color: #aaa; }
 
-/* רספונסיביות */
 @media (max-width: 600px) {
     #map,
     #sound-box,
     #alert-box {
         display: none !important;
     }
-
+    
     #sound-box {
         width: 90%;
         right: 50%;
@@ -297,16 +291,31 @@ renderDateTimeBox();
 
 <script>
 async function initApp() {
-  const tempConfig = { databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" };
-  firebase.initializeApp(tempConfig);
-  const dbTemp = firebase.database();
   try {
+      // --- אתחול Firebase זמני ---
+      let appTemp;
+      if (!firebase.apps.length) {
+          appTemp = firebase.initializeApp({ databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" });
+      } else {
+          appTemp = firebase.app();
+      }
+      const dbTemp = firebase.database(appTemp);
+
+      // --- קבלת מפתחות אמיתיים מ‑Firebase ---
       const snapshot = await dbTemp.ref("KEYS").once("value");
       const keys = snapshot.val();
       if(!keys) throw new Error("No KEYS found in DB!");
-      firebase.initializeApp(keys.firebaseConfig);
-      const db = firebase.database();
 
+      // אם כבר לא קיים default app, אתחל עם keys.firebaseConfig
+      let appMain;
+      if (!firebase.apps.length) {
+          appMain = firebase.initializeApp(keys.firebaseConfig);
+      } else {
+          appMain = firebase.app();
+      }
+      const db = firebase.database(appMain);
+
+      // טעינת Google Maps דינמית
       const mapsScript = document.createElement("script");
       mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
       mapsScript.async = true;

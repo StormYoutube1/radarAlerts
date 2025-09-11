@@ -292,7 +292,6 @@ renderDateTimeBox();
 <script>
 async function initApp() {
   try {
-      // --- אתחול Firebase זמני ---
       let appTemp;
       if (!firebase.apps.length) {
           appTemp = firebase.initializeApp({ databaseURL: "https://radar-7c02f-default-rtdb.firebaseio.com" });
@@ -301,12 +300,10 @@ async function initApp() {
       }
       const dbTemp = firebase.database(appTemp);
 
-      // --- קבלת מפתחות אמיתיים מ‑Firebase ---
       const snapshot = await dbTemp.ref("KEYS").once("value");
       const keys = snapshot.val();
       if(!keys) throw new Error("No KEYS found in DB!");
 
-      // אם כבר לא קיים default app, אתחל עם keys.firebaseConfig
       let appMain;
       if (!firebase.apps.length) {
           appMain = firebase.initializeApp(keys.firebaseConfig);
@@ -315,7 +312,6 @@ async function initApp() {
       }
       const db = firebase.database(appMain);
 
-      // טעינת Google Maps דינמית
       const mapsScript = document.createElement("script");
       mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&language=he&callback=initMap&v=weekly&loading=async`;
       mapsScript.async = true;
@@ -328,7 +324,6 @@ async function initApp() {
 
       const sounds = { calm: "calm.mp3", siren: "alert.mp3", homefront: "homefront.mp3", alert: "siren.mp3", beep: "beep.wav" };
 
-      // --- הרשאת התראות ---
       const notifyCheckbox = document.getElementById("notifyPermission");
       function updateNotifyCheckbox() {
         desktopPermissionGranted = Notification.permission === "granted";
@@ -367,7 +362,6 @@ async function initApp() {
         notification.onclick = () => window.focus();
       }
 
-      // --- מפה ---
       window.initMap = function initMap() {
         map = new google.maps.Map(document.getElementById('map'), {
           center: {lat: 31.5, lng: 34.8},
@@ -385,7 +379,6 @@ async function initApp() {
         setTimeout(() => { marker.setMap(null); clearInterval(flashInterval); markers = markers.filter(m => m!==marker); }, 10000);
       }
 
-      // --- סאונד ---
       const enableSoundCheckbox = document.getElementById("enable-sound");
       const soundSelect = document.getElementById("sound-select");
       const soundBtn = document.getElementById("sound-btn");
@@ -405,7 +398,6 @@ async function initApp() {
       soundSelect.addEventListener("change", updateSoundButton);
       updateSoundButton();
 
-      // --- טעינת JSONs ---
       Promise.all([
         db.ref("citiesData").once("value").then(snapshot => snapshot.val()), 
         db.ref("areasData").once("value").then(snapshot => snapshot.val()),
@@ -504,7 +496,6 @@ async function initApp() {
           }
         });
 
-        // --- חיפוש ערים + הצעות ---
         const searchInput = document.getElementById("city-search");
         const suggestionsBox = document.getElementById("city-suggestions");
         const selectedCitiesContainer = document.getElementById("selected-cities");
@@ -571,4 +562,3 @@ initApp();
 
 </body>
 </html>
-

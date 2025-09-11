@@ -317,7 +317,7 @@ async function initApp() {
 
       // טעינת Google Maps דינמית
       const mapsScript = document.createElement("script");
-      mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&callback=initMap&language=he`;
+      mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${keys.googleMapsKey}&language=he&callback=initMap&v=weekly&loading=async`;
       mapsScript.async = true;
       mapsScript.defer = true;
       document.head.appendChild(mapsScript);
@@ -571,3 +571,4 @@ initApp();
 
 </body>
 </html>
+
